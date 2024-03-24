@@ -43,3 +43,23 @@ func (m *Backend) GetDenomsMetadata(pageNo int) (berpctypes.GenericBackendRespon
 
 	return res, nil
 }
+
+func (m *Backend) GetTotalSupply(pageNo int) (berpctypes.GenericBackendResponse, error) {
+	if pageNo < 1 {
+		return nil, berpctypes.ErrBadPageNo
+	}
+
+	resTotalSupply, err := m.queryClient.BankQueryClient.TotalSupply(m.ctx, &banktypes.QueryTotalSupplyRequest{
+		Pagination: getDefaultPagination(pageNo),
+	})
+	if err != nil {
+		return nil, status.Error(codes.Internal, errors.Wrap(err, "failed to get total supply").Error())
+	}
+
+	res := make(berpctypes.GenericBackendResponse)
+	for _, coin := range resTotalSupply.Supply {
+		res[coin.Denom] = coin.Amount.String()
+	}
+
+	return res, nil
+}

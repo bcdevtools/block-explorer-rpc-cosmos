@@ -19,3 +19,14 @@ func (api *API) GetDenomsMetadata(pageNoOptional *int) (berpctypes.GenericBacken
 
 	return api.backend.GetDenomsMetadata(pageNo)
 }
+
+func (api *API) GetTotalSupply(pageNoOptional *int) (berpctypes.GenericBackendResponse, error) {
+	api.logger.Debug("be_getTotalSupply")
+
+	pageNo, err := getPageNumber(pageNoOptional)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.backend.GetTotalSupply(pageNo)
+}
