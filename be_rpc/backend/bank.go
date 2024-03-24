@@ -8,6 +8,21 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+func (m *Backend) GetDenomMetadata(base string) (berpctypes.GenericBackendResponse, error) {
+	resDenomMetadata, err := m.queryClient.BankQueryClient.DenomMetadata(m.ctx, &banktypes.QueryDenomMetadataRequest{
+		Denom: base,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	res := make(berpctypes.GenericBackendResponse)
+	rpcDenomMetadata := berpctypes.NewRpcDenomMetadataFromBankMetadata(resDenomMetadata.Metadata)
+	res[resDenomMetadata.Metadata.Base] = rpcDenomMetadata
+
+	return res, nil
+}
+
 func (m *Backend) GetDenomsMetadata() (berpctypes.GenericBackendResponse, error) {
 	resDenomMetadata, err := m.queryClient.BankQueryClient.DenomsMetadata(m.ctx, &banktypes.QueryDenomsMetadataRequest{})
 	if err != nil {
