@@ -1,7 +1,6 @@
 package backend
 
 import (
-	"encoding/json"
 	berpctypes "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
@@ -118,15 +117,9 @@ func (m *Backend) GetModuleParams(moduleName string) (berpctypes.GenericBackendR
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	bz, err := json.Marshal(params)
+	res, err := berpctypes.NewGenericBackendResponseFrom(params)
 	if err != nil {
-		return nil, status.Error(codes.Internal, errors.Wrap(err, "failed to marshal module params").Error())
-	}
-
-	var res berpctypes.GenericBackendResponse
-	err = json.Unmarshal(bz, &res)
-	if err != nil {
-		return nil, status.Error(codes.Internal, errors.Wrap(err, "failed to build module params response").Error())
+		return nil, status.Error(codes.Internal, errors.Wrap(err, "module params").Error())
 	}
 
 	return res, nil
