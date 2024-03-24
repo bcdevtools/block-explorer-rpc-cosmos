@@ -150,7 +150,7 @@ func (m *Backend) GetTransactionByHash(hashStr string) (berpctypes.GenericBacken
 
 	tx := res.Tx
 	txRes := res.TxResponse
-	txEvents := berpctypes.ConvertTxEvent(txRes.Events)
+	txEvents := berpctypes.ConvertTxEvent(txRes.Events).RemoveUnnecessaryEvmTxEvents()
 
 	msgsInfo := make([]map[string]any, 0)
 	for msgIdx, msg := range tx.Body.Messages {

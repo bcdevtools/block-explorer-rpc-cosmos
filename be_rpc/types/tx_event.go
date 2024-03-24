@@ -1,6 +1,12 @@
 package types
 
-import abci "github.com/tendermint/tendermint/abci/types"
+import (
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	abci "github.com/tendermint/tendermint/abci/types"
+	"strings"
+)
+
+type TxEvents []TxEvent
 
 type TxEvent struct {
 	Type       string             `json:"type,omitempty"`
@@ -12,7 +18,7 @@ type TxEventAttribute struct {
 	Value string `json:"value,omitempty"`
 }
 
-func ConvertTxEvent(events []abci.Event) []TxEvent {
+func ConvertTxEvent(events []abci.Event) TxEvents {
 	var res []TxEvent
 	for _, event := range events {
 		var attributes []TxEventAttribute
@@ -28,4 +34,53 @@ func ConvertTxEvent(events []abci.Event) []TxEvent {
 		})
 	}
 	return res
+}
+
+func (m TxEvents) RemoveUnnecessaryEvmTxEvents() TxEvents {
+	remove := func() TxEvents {
+		txEventsTruncatedEvm := make([]TxEvent, 0)
+		for _, event := range m {
+			// remove unnecessary events
+
+			if event.Type == EventTypeEthereumTx {
+				continue
+			}
+
+			if event.Type == EventTypeTxLog {
+				continue
+			}
+
+			if event.Type == sdk.EventTypeMessage {
+				var ignore bool
+				for _, attribute := range event.Attributes {
+					if attribute.Key == sdk.AttributeKeyModule && attribute.Value == AttributeValueCategory {
+						ignore = true
+						break
+					} else if attribute.Key == sdk.AttributeKeyAction && strings.HasSuffix(attribute.Value, "MsgEthereumTx") {
+						ignore = true
+						break
+					}
+				}
+				if ignore {
+					continue
+				}
+			}
+
+			txEventsTruncatedEvm = append(txEventsTruncatedEvm, event)
+		}
+
+		return txEventsTruncatedEvm
+	}
+
+	for _, event := range m {
+		if event.Type == sdk.EventTypeMessage {
+			for _, attribute := range event.Attributes {
+				if attribute.Key == sdk.AttributeKeyAction && strings.HasSuffix(attribute.Value, "MsgEthereumTx") {
+					return remove()
+				}
+			}
+		}
+	}
+
+	return m
 }
