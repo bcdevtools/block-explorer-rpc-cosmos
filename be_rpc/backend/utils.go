@@ -1,6 +1,8 @@
 package backend
 
-import "github.com/cosmos/cosmos-sdk/types/query"
+import (
+	"github.com/cosmos/cosmos-sdk/types/query"
+)
 
 const defaultPageSize = 20
 
