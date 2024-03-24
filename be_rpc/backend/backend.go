@@ -48,7 +48,7 @@ type BackendI interface {
 	// Misc
 
 	GetDenomMetadata(base string) (berpctypes.GenericBackendResponse, error)
-	GetDenomsMetadata() (berpctypes.GenericBackendResponse, error)
+	GetDenomsMetadata(pageNo int) (berpctypes.GenericBackendResponse, error)
 
 	// Export fields
 

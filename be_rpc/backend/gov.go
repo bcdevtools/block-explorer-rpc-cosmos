@@ -3,15 +3,12 @@ package backend
 import (
 	berpctypes "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/types"
 	berpcutils "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/utils"
-	"github.com/cosmos/cosmos-sdk/types/query"
 	govv1types "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 func (m *Backend) GetGovProposals(pageNo int) (berpctypes.GenericBackendResponse, error) {
-	const pageSize = 20
-
 	if pageNo < 1 {
 		return nil, berpctypes.ErrBadPageNo
 	}
@@ -20,12 +17,7 @@ func (m *Backend) GetGovProposals(pageNo int) (berpctypes.GenericBackendResponse
 		ProposalStatus: 0,
 		Voter:          "",
 		Depositor:      "",
-		Pagination: &query.PageRequest{
-			Key:     nil,
-			Offset:  uint64(pageSize * (pageNo - 1)),
-			Limit:   pageSize,
-			Reverse: true,
-		},
+		Pagination:     getDefaultPagination(pageNo),
 	})
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
@@ -76,6 +68,6 @@ func (m *Backend) GetGovProposals(pageNo int) (berpctypes.GenericBackendResponse
 	return berpctypes.GenericBackendResponse{
 		"proposals": proposals,
 		"pageNo":    pageNo,
-		"pageSize":  pageSize,
+		"pageSize":  defaultPageSize,
 	}, nil
 }

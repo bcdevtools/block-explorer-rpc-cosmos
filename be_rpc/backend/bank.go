@@ -23,8 +23,14 @@ func (m *Backend) GetDenomMetadata(base string) (berpctypes.GenericBackendRespon
 	return res, nil
 }
 
-func (m *Backend) GetDenomsMetadata() (berpctypes.GenericBackendResponse, error) {
-	resDenomMetadata, err := m.queryClient.BankQueryClient.DenomsMetadata(m.ctx, &banktypes.QueryDenomsMetadataRequest{})
+func (m *Backend) GetDenomsMetadata(pageNo int) (berpctypes.GenericBackendResponse, error) {
+	if pageNo < 1 {
+		return nil, berpctypes.ErrBadPageNo
+	}
+
+	resDenomMetadata, err := m.queryClient.BankQueryClient.DenomsMetadata(m.ctx, &banktypes.QueryDenomsMetadataRequest{
+		Pagination: getDefaultPagination(pageNo),
+	})
 	if err != nil {
 		return nil, status.Error(codes.Internal, errors.Wrap(err, "failed to get denoms metadata").Error())
 	}
