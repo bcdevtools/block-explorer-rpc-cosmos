@@ -29,6 +29,7 @@ type APICreator = func(
 	tendermintWebsocketClient *rpcclient.WSClient,
 	messageParsers map[string]berpctypes.MessageParser,
 	messageInvolversExtractors map[string]berpctypes.MessageInvolversExtractor,
+	requestInterceptorCreator func(i backend.BackendI) backend.RequestInterceptor,
 	externalServices berpctypes.ExternalServices,
 ) []rpc.API
 
@@ -48,9 +49,13 @@ func init() {
 			tmWSClient *rpcclient.WSClient,
 			messageParsers map[string]berpctypes.MessageParser,
 			messageInvolversExtractors map[string]berpctypes.MessageInvolversExtractor,
+			requestInterceptorCreator func(i backend.BackendI) backend.RequestInterceptor,
 			externalServices berpctypes.ExternalServices,
 		) []rpc.API {
 			backend := backend.NewBackend(ctx, ctx.Logger, clientCtx, messageParsers, messageInvolversExtractors, externalServices)
+			if requestInterceptorCreator != nil {
+				backend = backend.WithInterceptor(requestInterceptorCreator(backend))
+			}
 			return []rpc.API{
 				{
 					Namespace: DymRollAppBlockExplorerNamespace,
@@ -69,6 +74,7 @@ func init() {
 func GetBeRpcAPIs(ctx *server.Context,
 	clientCtx client.Context,
 	tendermintWebsocketClient *rpcclient.WSClient,
+	requestInterceptorCreator func(backend.BackendI) backend.RequestInterceptor,
 	externalServices berpctypes.ExternalServices,
 ) []rpc.API {
 	var apis []rpc.API
@@ -80,6 +86,7 @@ func GetBeRpcAPIs(ctx *server.Context,
 			tendermintWebsocketClient,
 			messageParsers,
 			messageInvolversExtractors,
+			requestInterceptorCreator,
 			externalServices,
 		)...)
 	}

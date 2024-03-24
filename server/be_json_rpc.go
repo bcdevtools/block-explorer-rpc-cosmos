@@ -2,6 +2,7 @@ package server
 
 import (
 	"github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc"
+	"github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/backend"
 	berpccfg "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/config"
 	berpctypes "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/types"
 	tmlog "github.com/tendermint/tendermint/libs/log"
@@ -28,6 +29,7 @@ func StartBeJsonRPC(ctx *server.Context,
 	tmRPCAddr,
 	tmEndpoint string,
 	config berpccfg.BeJsonRpcConfig,
+	requestInterceptorCreator func(backend.BackendI) backend.RequestInterceptor,
 	externalServices berpctypes.ExternalServices,
 ) (*http.Server, chan struct{}, error) {
 	tmWsClient := connectTmWS(tmRPCAddr, tmEndpoint, ctx.Logger)
@@ -47,7 +49,7 @@ func StartBeJsonRPC(ctx *server.Context,
 
 	rpcServer := ethrpc.NewServer()
 
-	apis := be_rpc.GetBeRpcAPIs(ctx, clientCtx, tmWsClient, externalServices)
+	apis := be_rpc.GetBeRpcAPIs(ctx, clientCtx, tmWsClient, requestInterceptorCreator, externalServices)
 
 	for _, api := range apis {
 		if err := rpcServer.RegisterName(api.Namespace, api.Service); err != nil {
