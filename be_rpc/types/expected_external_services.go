@@ -15,6 +15,9 @@ type ExpectedEVMTxIndexer interface {
 
 	// GetByTxHashForExternal returns nil if tx not found.
 	GetByTxHashForExternal(common.Hash) (TxResultForExternal, error)
+
+	// GetIndexer returns the indexer instance.
+	GetIndexer() any
 }
 
 type TxResultForExternal interface {
