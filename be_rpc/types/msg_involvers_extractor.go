@@ -4,12 +4,11 @@ import (
 	"github.com/cosmos/cosmos-sdk/client"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/tx"
-	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	tmtypes "github.com/tendermint/tendermint/types"
 	"strings"
 )
 
-type MessageInvolversExtractor func(msg sdk.Msg, tx *tx.Tx, tmTx tmtypes.Tx, optionalTxResult *coretypes.ResultTx, clientCtx client.Context) (MessageInvolversResult, error)
+type MessageInvolversExtractor func(msg sdk.Msg, tx *tx.Tx, tmTx tmtypes.Tx, clientCtx client.Context) (MessageInvolversResult, error)
 
 type InvolversType string
 

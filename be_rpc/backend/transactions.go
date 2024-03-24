@@ -102,7 +102,7 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 					messageInvolversExtractor = m.defaultMessageInvolversExtractor
 				}
 
-				resInvolvers, err := messageInvolversExtractor(cosmosMsg, tx, tmTx, optionalTxResult, m.clientCtx)
+				resInvolvers, err := messageInvolversExtractor(cosmosMsg, tx, tmTx, m.clientCtx)
 				if err == nil {
 					involvers = resInvolvers.Finalize()
 				}
@@ -1156,7 +1156,7 @@ func (m *Backend) addIbcPacketInfoIntoResponse(packet channeltypes.Packet, res b
 	}
 }
 
-func (m *Backend) defaultMessageInvolversExtractor(msg sdk.Msg, tx *tx.Tx, tmTx tmtypes.Tx, optionalTxResult *coretypes.ResultTx, clientCtx client.Context) (res berpctypes.MessageInvolversResult, err error) {
+func (m *Backend) defaultMessageInvolversExtractor(msg sdk.Msg, tx *tx.Tx, tmTx tmtypes.Tx, clientCtx client.Context) (res berpctypes.MessageInvolversResult, err error) {
 	res = make(berpctypes.MessageInvolversResult)
 
 	switch msg := msg.(type) {
@@ -1302,7 +1302,7 @@ func (m *Backend) defaultMessageInvolversExtractor(msg sdk.Msg, tx *tx.Tx, tmTx 
 				if err != nil {
 					continue
 				}
-				resChild, err := m.defaultMessageInvolversExtractor(cosmosMsg, tx, tmTx, optionalTxResult, clientCtx)
+				resChild, err := m.defaultMessageInvolversExtractor(cosmosMsg, tx, tmTx, clientCtx)
 				if err != nil {
 					continue
 				}
