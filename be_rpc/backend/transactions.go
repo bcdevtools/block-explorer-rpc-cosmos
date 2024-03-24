@@ -22,6 +22,7 @@ import (
 	ibctypes "github.com/cosmos/ibc-go/v6/modules/core/02-client/types"
 	connectiontypes "github.com/cosmos/ibc-go/v6/modules/core/03-connection/types"
 	channeltypes "github.com/cosmos/ibc-go/v6/modules/core/04-channel/types"
+	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	tmtypes "github.com/tendermint/tendermint/types"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -68,13 +69,15 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 			txHash := strings.ToUpper(hex.EncodeToString(tmTx.Hash()))
 			txType := "cosmos"
 
+			var optionalTxResult *coretypes.ResultTx
 			if berpcutils.IsEvmTx(tx) {
-				resultTx, err := m.clientCtx.Client.Tx(m.ctx, tmTx.Hash(), false)
-				if err != nil {
-					m.GetLogger().Error("failed to query tx", "error", err)
-				} else if resultTx == nil {
+				var errTxResult error
+				optionalTxResult, errTxResult = m.clientCtx.Client.Tx(m.ctx, tmTx.Hash(), false)
+				if errTxResult != nil {
+					m.GetLogger().Error("failed to query tx", "error", errTxResult)
+				} else if optionalTxResult == nil {
 					// ignore
-				} else if evmTxHash := berpcutils.GetEvmTransactionHashFromEvent(resultTx.TxResult.Events); evmTxHash != nil {
+				} else if evmTxHash := berpcutils.GetEvmTransactionHashFromEvent(optionalTxResult.TxResult.Events); evmTxHash != nil {
 					txHash = berpcutils.NormalizeTransactionHash(evmTxHash.String(), false)
 					txType = "evm"
 				}
@@ -99,7 +102,7 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 					messageInvolversExtractor = m.defaultMessageInvolversExtractor
 				}
 
-				resInvolvers, err := messageInvolversExtractor(cosmosMsg, tx, tmTx, m.clientCtx)
+				resInvolvers, err := messageInvolversExtractor(cosmosMsg, tx, tmTx, optionalTxResult, m.clientCtx)
 				if err == nil {
 					involvers = resInvolvers.Finalize()
 				}
@@ -1153,7 +1156,7 @@ func (m *Backend) addIbcPacketInfoIntoResponse(packet channeltypes.Packet, res b
 	}
 }
 
-func (m *Backend) defaultMessageInvolversExtractor(msg sdk.Msg, tx *tx.Tx, tmTx tmtypes.Tx, clientCtx client.Context) (res berpctypes.MessageInvolversResult, err error) {
+func (m *Backend) defaultMessageInvolversExtractor(msg sdk.Msg, tx *tx.Tx, tmTx tmtypes.Tx, optionalTxResult *coretypes.ResultTx, clientCtx client.Context) (res berpctypes.MessageInvolversResult, err error) {
 	res = make(berpctypes.MessageInvolversResult)
 
 	switch msg := msg.(type) {
@@ -1299,7 +1302,7 @@ func (m *Backend) defaultMessageInvolversExtractor(msg sdk.Msg, tx *tx.Tx, tmTx 
 				if err != nil {
 					continue
 				}
-				resChild, err := m.defaultMessageInvolversExtractor(cosmosMsg, tx, tmTx, clientCtx)
+				resChild, err := m.defaultMessageInvolversExtractor(cosmosMsg, tx, tmTx, optionalTxResult, clientCtx)
 				if err != nil {
 					continue
 				}

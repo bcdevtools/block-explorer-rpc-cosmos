@@ -68,6 +68,8 @@ func init() {
 	}
 
 	messageParsers = make(map[string]berpctypes.MessageParser)
+
+	messageInvolversExtractors = make(map[string]berpctypes.MessageInvolversExtractor)
 }
 
 // GetBeRpcAPIs returns the list of all BE-Json-APIs
