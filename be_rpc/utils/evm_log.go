@@ -1,6 +1,7 @@
 package utils
 
 import (
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
 	"math/big"
 )
@@ -54,4 +55,8 @@ func IsEvmEventMatch(
 	}
 
 	return true
+}
+
+func AccAddressFromTopic(topic common.Hash) sdk.AccAddress {
+	return common.BytesToAddress(topic.Bytes()[12:]).Bytes()
 }

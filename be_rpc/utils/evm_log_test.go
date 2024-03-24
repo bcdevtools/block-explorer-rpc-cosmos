@@ -1,6 +1,7 @@
 package utils
 
 import (
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 	"testing"
@@ -249,4 +250,13 @@ func TestIsEvmEventMatch(t *testing.T) {
 			),
 		)
 	})
+}
+
+func TestAccAddressFromTopic(t *testing.T) {
+	addrTopic := common.HexToHash("0x0000000000000000000000007af33266ef0f967b01376f613387fc7c88699967")
+	addr := common.HexToAddress("0x7af33266ef0f967b01376f613387fc7c88699967")
+	require.Equal(t,
+		sdk.AccAddress(addr.Bytes()),
+		AccAddressFromTopic(addrTopic),
+	)
 }
