@@ -18,6 +18,10 @@ type BackendI interface {
 	// GetModuleParams returns the module parameters by module name.
 	GetModuleParams(moduleName string) (berpctypes.GenericBackendResponse, error)
 
+	// Account
+
+	// TODO BE get account
+
 	// Block
 
 	// GetBlockByNumber returns a block by its height.
