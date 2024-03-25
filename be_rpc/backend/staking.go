@@ -78,3 +78,24 @@ func (m *Backend) GetStakingInfo(delegatorAddr string) (berpctypes.GenericBacken
 
 	return res, nil
 }
+
+func (m *Backend) GetValidators() (berpctypes.GenericBackendResponse, error) {
+	validators, err := m.validatorsCache.GetValidators()
+	if err != nil {
+		return nil, status.Error(codes.Internal, errors.Wrap(err, "failed to get validators").Error())
+	}
+
+	res := make(berpctypes.GenericBackendResponse)
+	for _, validator := range validators {
+		consAddr := sdk.ConsAddress(validator.Address).String()
+		valAddr, _ := m.validatorsCache.GetValAddress(consAddr)
+		res[consAddr] = map[string]any{
+			"cons_address": consAddr,
+			"val_address":  valAddr,
+			"pubKey_type":  validator.PubKey.Type(),
+			"voting_power": validator.VotingPower,
+		}
+	}
+
+	return res, nil
+}

@@ -45,6 +45,8 @@ type BackendI interface {
 	// - Validator's commission & outstanding rewards
 	GetStakingInfo(delegatorAddr string) (berpctypes.GenericBackendResponse, error)
 
+	GetValidators() (berpctypes.GenericBackendResponse, error)
+
 	// Gov
 
 	GetGovProposal(proposalId uint64) (berpctypes.GenericBackendResponse, error)
@@ -80,6 +82,9 @@ type Backend struct {
 	messageParsers             map[string]berpctypes.MessageParser
 	messageInvolversExtractors map[string]berpctypes.MessageInvolversExtractor
 	externalServices           berpctypes.ExternalServices
+
+	// cache
+	validatorsCache *validatorsCache
 }
 
 // NewBackend creates a new Backend instance for RollApp Block Explorer
@@ -96,15 +101,17 @@ func NewBackend(
 		panic(err)
 	}
 
+	queryClient := berpctypes.NewQueryClient(clientCtx)
 	return &Backend{
 		ctx:                        context.Background(),
 		clientCtx:                  clientCtx,
-		queryClient:                berpctypes.NewQueryClient(clientCtx),
+		queryClient:                queryClient,
 		logger:                     logger.With("module", "be_rpc"),
 		cfg:                        appConf,
 		messageParsers:             messageParsers,
 		messageInvolversExtractors: messageInvolversExtractors,
 		externalServices:           externalServices,
+		validatorsCache:            NewValidatorsCache(clientCtx.Client, queryClient.StakingQueryClient, clientCtx.Codec),
 	}
 }
 
