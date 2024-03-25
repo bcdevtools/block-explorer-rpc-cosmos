@@ -24,8 +24,6 @@ type BackendI interface {
 
 	GetAccount(accountAddressStr string) (berpctypes.GenericBackendResponse, error)
 
-	// TODO BE get account
-
 	// Block
 
 	// GetBlockByNumber returns a block by its height.
@@ -40,7 +38,7 @@ type BackendI interface {
 	// GetTransactionByHash returns a transaction by its hash.
 	GetTransactionByHash(hash string) (berpctypes.GenericBackendResponse, error)
 
-	// TODO get all ERC-20 & NFT contracts and involvers within tx
+	// TODO BE: get all ERC-20 & NFT contracts and involvers within tx
 
 	// Staking
 
@@ -52,6 +50,8 @@ type BackendI interface {
 	// Gov
 
 	GetGovProposals(pageNo int) (berpctypes.GenericBackendResponse, error)
+
+	// TODO BE: get proposal by ID
 
 	// Misc
 

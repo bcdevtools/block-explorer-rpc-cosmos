@@ -6,7 +6,9 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/ethereum/go-ethereum/common"
+	"strings"
 )
 
 func (m *Backend) GetAccountBalances(accountAddressStr string, denom *string) (berpctypes.GenericBackendResponse, error) {
@@ -68,12 +70,13 @@ func (m *Backend) GetAccount(accountAddressStr string) (berpctypes.GenericBacken
 		}
 	}
 
+	res["address"] = addressInfo
+
 	balancesInfo, err := m.GetAccountBalances(accAddrStr, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	res["address"] = addressInfo
 	res["balances"] = balancesInfo
 
 	if res["contract"] == nil {
@@ -94,6 +97,37 @@ func (m *Backend) GetAccount(accountAddressStr string) (berpctypes.GenericBacken
 				res["txs_count"] = fakeBaseAccount.Sequence + 1
 			} else if err != nil {
 				m.GetLogger().Error("failed to extract base account", "error", err)
+			}
+		}
+
+		if strings.HasPrefix(accAddrStr, sdk.GetConfig().GetBech32ValidatorAddrPrefix()+"1") {
+			resVal, err := m.queryClient.StakingQueryClient.Validator(m.ctx, &stakingtypes.QueryValidatorRequest{
+				ValidatorAddr: accAddrStr,
+			})
+			if err == nil && resVal != nil {
+				validatorInfo := berpctypes.GenericBackendResponse{
+					"operator_address": resVal.Validator.OperatorAddress,
+					"consensus_pubkey": resVal.Validator.ConsensusPubkey,
+					"jailed":           resVal.Validator.Jailed,
+					"status":           resVal.Validator.Status.String(),
+					"tokens":           resVal.Validator.Tokens.String(),
+					"delegator_shares": resVal.Validator.DelegatorShares.String(),
+					"description": berpctypes.GenericBackendResponse{
+						"moniker":          resVal.Validator.Description.Moniker,
+						"identity":         resVal.Validator.Description.Identity,
+						"website":          resVal.Validator.Description.Website,
+						"security_contact": resVal.Validator.Description.SecurityContact,
+						"details":          resVal.Validator.Description.Details,
+					},
+					"unbonding_height":    resVal.Validator.UnbondingHeight,
+					"unbonding_time":      resVal.Validator.UnbondingTime,
+					"commission":          resVal.Validator.Commission,
+					"min_self_delegation": resVal.Validator.MinSelfDelegation.String(),
+				}
+
+				res["validator"] = validatorInfo
+			} else if err != nil {
+				m.GetLogger().Error("failed to get validator", "error", err)
 			}
 		}
 	}

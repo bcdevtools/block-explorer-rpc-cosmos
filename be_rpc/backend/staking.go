@@ -13,6 +13,7 @@ import (
 )
 
 func (m *Backend) GetStakingInfo(delegatorAddr string) (berpctypes.GenericBackendResponse, error) {
+	delegatorAddr = strings.ToLower(strings.TrimSpace(delegatorAddr))
 	unsafeDelegatorAddr := berpcutils.FromAnyToBech32AddressUnsafe(delegatorAddr)
 
 	resDd, err := m.queryClient.StakingQueryClient.DelegatorDelegations(m.ctx, &stakingtypes.QueryDelegatorDelegationsRequest{
@@ -31,7 +32,7 @@ func (m *Backend) GetStakingInfo(delegatorAddr string) (berpctypes.GenericBacken
 
 	validatorCommission := sdk.DecCoins{}
 	validatorOutstandingRewards := sdk.DecCoins{}
-	if strings.Contains(delegatorAddr, "valoper") { // possible of being a validator address
+	if strings.HasPrefix(delegatorAddr, sdk.GetConfig().GetBech32ValidatorAddrPrefix()+"1") { // possible of being a validator address
 		resCom, err := m.queryClient.DistributionQueryClient.ValidatorCommission(m.ctx, &disttypes.QueryValidatorCommissionRequest{
 			ValidatorAddress: delegatorAddr,
 		})
