@@ -155,6 +155,21 @@ func (m *Backend) GetAccount(accountAddressStr string) (berpctypes.GenericBacken
 			validatorInfo["consensus_pubkey"] = consensusPubKeyMap
 		}
 
+		consAddr, success := berpcutils.FromAnyPubKeyToConsensusAddress(resValInfo.Validator.ConsensusPubkey, m.clientCtx.Codec)
+		if success {
+			validatorInfo["consensus_address"] = consAddr.String()
+			tmVals, err := m.tendermintValidatorsCache.GetValidators()
+			if err != nil {
+				return nil, status.Error(codes.Internal, errors.Wrap(err, "failed to get validators").Error())
+			}
+			for _, val := range tmVals {
+				if sdk.ConsAddress(val.Address).String() == consAddr.String() {
+					validatorInfo["voting_power"] = val.VotingPower
+					break
+				}
+			}
+		}
+
 		res["validator"] = validatorInfo
 	}
 
