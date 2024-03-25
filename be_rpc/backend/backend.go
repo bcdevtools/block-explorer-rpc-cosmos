@@ -38,8 +38,6 @@ type BackendI interface {
 	// GetTransactionByHash returns a transaction by its hash.
 	GetTransactionByHash(hash string) (berpctypes.GenericBackendResponse, error)
 
-	// TODO BE: get all ERC-20 & NFT contracts and involvers within tx
-
 	// Staking
 
 	// GetStakingInfo returns the staking information, includes:
@@ -49,9 +47,9 @@ type BackendI interface {
 
 	// Gov
 
-	GetGovProposals(pageNo int) (berpctypes.GenericBackendResponse, error)
+	GetGovProposal(proposalId uint64) (berpctypes.GenericBackendResponse, error)
 
-	// TODO BE: get proposal by ID
+	GetGovProposals(pageNo int) (berpctypes.GenericBackendResponse, error)
 
 	// Misc
 

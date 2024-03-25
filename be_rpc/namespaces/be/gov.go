@@ -4,6 +4,11 @@ import (
 	berpctypes "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/types"
 )
 
+func (api *API) GetGovProposal(proposal uint64) (berpctypes.GenericBackendResponse, error) {
+	api.logger.Debug("be_getGovProposal")
+	return api.backend.GetGovProposal(proposal)
+}
+
 func (api *API) GetGovProposals(pageNoOptional *int) (berpctypes.GenericBackendResponse, error) {
 	api.logger.Debug("be_getGovProposals")
 
