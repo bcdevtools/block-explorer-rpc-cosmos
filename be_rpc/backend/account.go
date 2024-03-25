@@ -41,6 +41,20 @@ func (m *Backend) GetAccountBalances(accountAddressStr string, denom *string) (b
 }
 
 func (m *Backend) GetAccount(accountAddressStr string) (berpctypes.GenericBackendResponse, error) {
+	res := make(berpctypes.GenericBackendResponse)
+
+	if m.interceptor != nil {
+		var intercepted bool
+		var err error
+		intercepted, _, res, err = m.interceptor.GetAccount(accountAddressStr)
+		if err != nil {
+			return nil, err
+		}
+		if intercepted {
+			return res, nil
+		}
+	}
+
 	accAddrStr := berpcutils.ConvertToAccAddressIfHexOtherwiseKeepAsIs(accountAddressStr)
 
 	addressInfo := berpctypes.GenericBackendResponse{
@@ -63,11 +77,9 @@ func (m *Backend) GetAccount(accountAddressStr string) (berpctypes.GenericBacken
 		return nil, err
 	}
 
-	res := berpctypes.GenericBackendResponse{
-		"address":  addressInfo,
-		"balances": balancesInfo,
-		"staking":  stakingInfo,
-	}
+	res["address"] = addressInfo
+	res["balances"] = balancesInfo
+	res["staking"] = stakingInfo
 
 	return res, nil
 }

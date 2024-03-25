@@ -16,4 +16,7 @@ type RequestInterceptor interface {
 
 	GetModuleParams(moduleName string) (intercepted bool, params berpctypes.GenericBackendResponse, err error)
 	// TODO BE: module wasm
+
+	GetAccount(accountAddressStr string) (intercepted, append bool, response berpctypes.GenericBackendResponse, err error)
+	// TODO BE: module wasm
 }
