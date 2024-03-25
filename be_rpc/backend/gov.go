@@ -45,11 +45,11 @@ func (m *Backend) GetGovProposals(pageNo int) (berpctypes.GenericBackendResponse
 						msgContent := make(map[string]any)
 						err = json.Unmarshal(bz, &msgContent)
 						if err == nil {
-							message["content"] = msgContent
+							message["proto_content"] = msgContent
 						}
 					}
 					if err != nil {
-						message["content_error"] = err.Error()
+						message["proto_content_error"] = err.Error()
 					}
 				}
 
