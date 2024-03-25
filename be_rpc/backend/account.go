@@ -4,6 +4,7 @@ import (
 	berpctypes "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/types"
 	berpcutils "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/utils"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -81,6 +82,20 @@ func (m *Backend) GetAccount(accountAddressStr string) (berpctypes.GenericBacken
 			return nil, err
 		}
 		res["staking"] = stakingInfo
+
+		resAccount, err := m.queryClient.AuthQueryClient.Account(m.ctx, &authtypes.QueryAccountRequest{
+			Address: accAddrStr,
+		})
+
+		if err == nil && resAccount != nil && resAccount.Account != nil {
+			fakeBaseAccount := &berpctypes.FakeBaseAccount{}
+			extractedSuccess, err := fakeBaseAccount.TryUnmarshalFromProto(resAccount.Account, m.clientCtx.Codec)
+			if err == nil && extractedSuccess {
+				res["txs_count"] = fakeBaseAccount.Sequence + 1
+			} else if err != nil {
+				m.GetLogger().Error("failed to extract base account", "error", err)
+			}
+		}
 	}
 
 	return res, nil

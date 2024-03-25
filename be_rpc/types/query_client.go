@@ -2,6 +2,7 @@ package types
 
 import (
 	"github.com/cosmos/cosmos-sdk/types/tx"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	disttypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
 	govv1types "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
@@ -21,6 +22,7 @@ type QueryClient struct {
 	DistributionQueryClient disttypes.QueryClient
 	GovV1QueryClient        govv1types.QueryClient
 	MintQueryClient         minttypes.QueryClient
+	AuthQueryClient         authtypes.QueryClient
 }
 
 // NewQueryClient creates a new gRPC query client
@@ -32,5 +34,6 @@ func NewQueryClient(clientCtx client.Context) *QueryClient {
 		DistributionQueryClient: disttypes.NewQueryClient(clientCtx),
 		GovV1QueryClient:        govv1types.NewQueryClient(clientCtx),
 		MintQueryClient:         minttypes.NewQueryClient(clientCtx),
+		AuthQueryClient:         authtypes.NewQueryClient(clientCtx),
 	}
 }
