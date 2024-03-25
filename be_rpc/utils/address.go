@@ -28,3 +28,11 @@ func FromAnyToBech32AddressUnsafe(addr string) string {
 
 	return addr
 }
+
+func ConvertToAccAddressIfHexOtherwiseKeepAsIs(addr string) string {
+	if strings.HasPrefix(addr, "0x") {
+		return sdk.AccAddress(common.HexToAddress(addr).Bytes()).String()
+	}
+
+	return addr
+}

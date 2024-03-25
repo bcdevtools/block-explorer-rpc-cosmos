@@ -22,6 +22,8 @@ type BackendI interface {
 
 	GetAccountBalances(accountAddressStr string, denom *string) (berpctypes.GenericBackendResponse, error)
 
+	GetAccount(accountAddressStr string) (berpctypes.GenericBackendResponse, error)
+
 	// TODO BE get account
 
 	// Block

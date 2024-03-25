@@ -38,7 +38,7 @@ func (m *Backend) GetChainInfo() (berpctypes.GenericBackendResponse, error) {
 	}
 
 	return berpctypes.GenericBackendResponse{
-		"rollAppType":             m.externalServices.RollAppType,
+		"chainType":               m.externalServices.ChainType,
 		"chainId":                 statusInfo.NodeInfo.Network,
 		"latestBlock":             statusInfo.SyncInfo.LatestBlockHeight,
 		"latestBlockTimeEpochUTC": statusInfo.SyncInfo.LatestBlockTime.UTC().Unix(),

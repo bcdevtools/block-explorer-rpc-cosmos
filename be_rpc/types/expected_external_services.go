@@ -5,9 +5,15 @@ import (
 )
 
 type ExternalServices struct {
-	RollAppType  string
+	ChainType    string
 	EvmTxIndexer ExpectedEVMTxIndexer
 }
+
+const (
+	ChainTypeDefault  = "cosmos"
+	ChainTypeEvm      = "evm"
+	ChainTypeCosmWasm = "wasm"
+)
 
 // ExpectedEVMTxIndexer defines the interface of custom eth tx indexer.
 type ExpectedEVMTxIndexer interface {
