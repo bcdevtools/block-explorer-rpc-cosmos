@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"encoding/json"
 	berpctypes "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/types"
 	berpcutils "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/utils"
 	govv1types "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
@@ -32,11 +33,30 @@ func (m *Backend) GetGovProposals(pageNo int) (berpctypes.GenericBackendResponse
 		}
 
 		if len(proposal.Messages) > 0 {
-			messagesType := make([]string, 0)
-			for _, message := range proposal.Messages {
-				messagesType = append(messagesType, message.TypeUrl)
+			messages := make([]map[string]any, 0)
+			for _, msg := range proposal.Messages {
+				message := map[string]any{
+					"type": msg.TypeUrl,
+				}
+
+				{
+					bz, err := m.clientCtx.Codec.MarshalJSON(msg)
+					if err == nil {
+						msgContent := make(map[string]any)
+						err = json.Unmarshal(bz, &msgContent)
+						if err == nil {
+							message["content"] = msgContent
+						}
+					}
+					if err != nil {
+						message["content_error"] = err.Error()
+					}
+				}
+
+				messages = append(messages, message)
 			}
-			proposalInfo["messagesType"] = messagesType
+			proposalInfo["messages"] = messages
+
 		}
 		if proposal.FinalTallyResult != nil {
 			proposalInfo["finalTallyResult"] = map[string]string{
