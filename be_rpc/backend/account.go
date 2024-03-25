@@ -72,14 +72,16 @@ func (m *Backend) GetAccount(accountAddressStr string) (berpctypes.GenericBacken
 		return nil, err
 	}
 
-	stakingInfo, err := m.GetStakingInfo(accAddrStr)
-	if err != nil {
-		return nil, err
-	}
-
 	res["address"] = addressInfo
 	res["balances"] = balancesInfo
-	res["staking"] = stakingInfo
+
+	if res["contract"] == nil {
+		stakingInfo, err := m.GetStakingInfo(accAddrStr)
+		if err != nil {
+			return nil, err
+		}
+		res["staking"] = stakingInfo
+	}
 
 	return res, nil
 }
