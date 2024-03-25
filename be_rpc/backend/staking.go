@@ -80,7 +80,7 @@ func (m *Backend) GetStakingInfo(delegatorAddr string) (berpctypes.GenericBacken
 }
 
 func (m *Backend) GetValidators() (berpctypes.GenericBackendResponse, error) {
-	validators, err := m.validatorsCache.GetValidators()
+	validators, err := m.tendermintValidatorsCache.GetValidators()
 	if err != nil {
 		return nil, status.Error(codes.Internal, errors.Wrap(err, "failed to get validators").Error())
 	}
@@ -88,7 +88,10 @@ func (m *Backend) GetValidators() (berpctypes.GenericBackendResponse, error) {
 	res := make(berpctypes.GenericBackendResponse)
 	for _, validator := range validators {
 		consAddr := sdk.ConsAddress(validator.Address).String()
-		valAddr, _ := m.validatorsCache.GetValAddress(consAddr)
+		valAddr, _, err := m.validatorsConsAddrToValAddr.GetValAddrFromConsAddr(consAddr)
+		if err != nil {
+			return nil, status.Error(codes.Internal, errors.Wrap(err, "failed to get valiator address from consensus address").Error())
+		}
 		res[consAddr] = map[string]any{
 			"cons_address": consAddr,
 			"val_address":  valAddr,

@@ -84,7 +84,8 @@ type Backend struct {
 	externalServices           berpctypes.ExternalServices
 
 	// cache
-	validatorsCache *validatorsCache
+	tendermintValidatorsCache   *tendermintValidatorsCache
+	validatorsConsAddrToValAddr *validatorsConsAddrToValAddr
 }
 
 // NewBackend creates a new Backend instance for RollApp Block Explorer
@@ -111,7 +112,14 @@ func NewBackend(
 		messageParsers:             messageParsers,
 		messageInvolversExtractors: messageInvolversExtractors,
 		externalServices:           externalServices,
-		validatorsCache:            NewValidatorsCache(clientCtx.Client, queryClient.StakingQueryClient, clientCtx.Codec),
+		tendermintValidatorsCache: NewTendermintValidatorsCache(
+			clientCtx.Client,
+		),
+		validatorsConsAddrToValAddr: NewValidatorsConsAddrToValAddrCache(
+			clientCtx.Client,
+			queryClient.StakingQueryClient,
+			clientCtx.Codec,
+		),
 	}
 }
 
