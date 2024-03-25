@@ -32,7 +32,9 @@ func (m *Backend) GetStakingInfo(delegatorAddr string) (berpctypes.GenericBacken
 
 	validatorCommission := sdk.DecCoins{}
 	validatorOutstandingRewards := sdk.DecCoins{}
-	if strings.HasPrefix(delegatorAddr, sdk.GetConfig().GetBech32ValidatorAddrPrefix()+"1") { // possible of being a validator address
+
+	isValidatorAddress := strings.HasPrefix(delegatorAddr, sdk.GetConfig().GetBech32ValidatorAddrPrefix()+"1")
+	if isValidatorAddress {
 		resCom, err := m.queryClient.DistributionQueryClient.ValidatorCommission(m.ctx, &disttypes.QueryValidatorCommissionRequest{
 			ValidatorAddress: delegatorAddr,
 		})

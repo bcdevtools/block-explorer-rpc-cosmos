@@ -8,6 +8,9 @@ import (
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/pkg/errors"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"strings"
 )
 
@@ -56,6 +59,10 @@ func (m *Backend) GetAccount(accountAddressStr string) (berpctypes.GenericBacken
 		if intercepted {
 			return res, nil
 		}
+		if res == nil {
+			// re-initialize
+			res = make(berpctypes.GenericBackendResponse)
+		}
 	}
 
 	accAddrStr := berpcutils.ConvertToAccAddressIfHexOtherwiseKeepAsIs(accountAddressStr)
@@ -72,20 +79,23 @@ func (m *Backend) GetAccount(accountAddressStr string) (berpctypes.GenericBacken
 
 	res["address"] = addressInfo
 
-	balancesInfo, err := m.GetAccountBalances(accAddrStr, nil)
-	if err != nil {
-		return nil, err
-	}
+	_, isSmartContract := res["contract"]
+	isValidatorAddress := !isSmartContract && strings.HasPrefix(accAddrStr, sdk.GetConfig().GetBech32ValidatorAddrPrefix()+"1")
 
-	res["balances"] = balancesInfo
+	// get account balance
 
-	if res["contract"] == nil {
-		stakingInfo, err := m.GetStakingInfo(accAddrStr)
+	if !isValidatorAddress {
+		balancesInfo, err := m.GetAccountBalances(accAddrStr, nil)
 		if err != nil {
 			return nil, err
 		}
-		res["staking"] = stakingInfo
 
+		res["balances"] = balancesInfo
+	}
+
+	// get account transaction count
+
+	if !isSmartContract && !isValidatorAddress {
 		resAccount, err := m.queryClient.AuthQueryClient.Account(m.ctx, &authtypes.QueryAccountRequest{
 			Address: accAddrStr,
 		})
@@ -99,37 +109,53 @@ func (m *Backend) GetAccount(accountAddressStr string) (berpctypes.GenericBacken
 				m.GetLogger().Error("failed to extract base account", "error", err)
 			}
 		}
+	}
 
-		if strings.HasPrefix(accAddrStr, sdk.GetConfig().GetBech32ValidatorAddrPrefix()+"1") {
-			resVal, err := m.queryClient.StakingQueryClient.Validator(m.ctx, &stakingtypes.QueryValidatorRequest{
-				ValidatorAddr: accAddrStr,
-			})
-			if err == nil && resVal != nil {
-				validatorInfo := berpctypes.GenericBackendResponse{
-					"operator_address": resVal.Validator.OperatorAddress,
-					"consensus_pubkey": resVal.Validator.ConsensusPubkey,
-					"jailed":           resVal.Validator.Jailed,
-					"status":           resVal.Validator.Status.String(),
-					"tokens":           resVal.Validator.Tokens.String(),
-					"delegator_shares": resVal.Validator.DelegatorShares.String(),
-					"description": berpctypes.GenericBackendResponse{
-						"moniker":          resVal.Validator.Description.Moniker,
-						"identity":         resVal.Validator.Description.Identity,
-						"website":          resVal.Validator.Description.Website,
-						"security_contact": resVal.Validator.Description.SecurityContact,
-						"details":          resVal.Validator.Description.Details,
-					},
-					"unbonding_height":    resVal.Validator.UnbondingHeight,
-					"unbonding_time":      resVal.Validator.UnbondingTime,
-					"commission":          resVal.Validator.Commission,
-					"min_self_delegation": resVal.Validator.MinSelfDelegation.String(),
-				}
+	// get staking information
 
-				res["validator"] = validatorInfo
-			} else if err != nil {
-				m.GetLogger().Error("failed to get validator", "error", err)
-			}
+	if !isSmartContract && !isValidatorAddress {
+		stakingInfo, err := m.GetStakingInfo(accAddrStr)
+		if err != nil {
+			return nil, err
 		}
+		res["staking"] = stakingInfo
+	}
+
+	// get validator information
+
+	if isValidatorAddress {
+		resValInfo, err := m.queryClient.StakingQueryClient.Validator(m.ctx, &stakingtypes.QueryValidatorRequest{
+			ValidatorAddr: accAddrStr,
+		})
+		if err != nil {
+			return nil, status.Error(codes.Internal, errors.Wrap(err, "failed to get validator info").Error())
+		}
+
+		validatorInfo := berpctypes.GenericBackendResponse{
+			"operator_address": resValInfo.Validator.OperatorAddress,
+			"jailed":           resValInfo.Validator.Jailed,
+			"status":           resValInfo.Validator.Status.String(),
+			"tokens":           resValInfo.Validator.Tokens.String(),
+			"delegator_shares": resValInfo.Validator.DelegatorShares.String(),
+			"description": berpctypes.GenericBackendResponse{
+				"moniker":          resValInfo.Validator.Description.Moniker,
+				"identity":         resValInfo.Validator.Description.Identity,
+				"website":          resValInfo.Validator.Description.Website,
+				"security_contact": resValInfo.Validator.Description.SecurityContact,
+				"details":          resValInfo.Validator.Description.Details,
+			},
+			"unbonding_height":    resValInfo.Validator.UnbondingHeight,
+			"unbonding_time":      resValInfo.Validator.UnbondingTime,
+			"commission":          resValInfo.Validator.Commission,
+			"min_self_delegation": resValInfo.Validator.MinSelfDelegation.String(),
+		}
+
+		consensusPubKeyMap, err := berpcutils.FromAnyToJsonMap(resValInfo.Validator.ConsensusPubkey, m.clientCtx.Codec)
+		if err == nil {
+			validatorInfo["consensus_pubkey"] = consensusPubKeyMap
+		}
+
+		res["validator"] = validatorInfo
 	}
 
 	return res, nil

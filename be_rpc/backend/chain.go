@@ -27,6 +27,9 @@ func (m *Backend) GetChainInfo() (berpctypes.GenericBackendResponse, error) {
 		if err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
+		if denoms == nil {
+			denoms = make(map[string]string) // re-initialize
+		}
 	}
 
 	if !intercepted {

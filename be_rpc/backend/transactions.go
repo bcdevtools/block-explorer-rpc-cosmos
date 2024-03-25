@@ -3,7 +3,6 @@ package backend
 import (
 	"cosmossdk.io/errors"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	berpctypes "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/types"
 	berpcutils "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/utils"
@@ -188,16 +187,11 @@ func (m *Backend) GetTransactionByHash(hashStr string) (berpctypes.GenericBacken
 		}
 
 		{
-			bz, err := m.clientCtx.Codec.MarshalJSON(msg)
-			if err == nil {
-				msgContent := make(map[string]any)
-				err = json.Unmarshal(bz, &msgContent)
-				if err == nil {
-					msgInfo["proto_content"] = msgContent
-				}
-			}
+			msgContent, err := berpcutils.FromAnyToJsonMap(msg, m.clientCtx.Codec)
 			if err != nil {
 				msgInfo["proto_content_error"] = err.Error()
+			} else {
+				msgInfo["proto_content"] = msgContent
 			}
 		}
 	}

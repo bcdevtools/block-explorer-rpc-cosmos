@@ -1,7 +1,6 @@
 package backend
 
 import (
-	"encoding/json"
 	berpctypes "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/types"
 	berpcutils "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/utils"
 	govv1types "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
@@ -40,16 +39,11 @@ func (m *Backend) GetGovProposals(pageNo int) (berpctypes.GenericBackendResponse
 				}
 
 				{
-					bz, err := m.clientCtx.Codec.MarshalJSON(msg)
-					if err == nil {
-						msgContent := make(map[string]any)
-						err = json.Unmarshal(bz, &msgContent)
-						if err == nil {
-							message["proto_content"] = msgContent
-						}
-					}
+					msgContent, err := berpcutils.FromAnyToJsonMap(msg, m.clientCtx.Codec)
 					if err != nil {
 						message["proto_content_error"] = err.Error()
+					} else {
+						message["proto_content"] = msgContent
 					}
 				}
 
