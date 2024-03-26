@@ -13,3 +13,8 @@ func (api *API) GetAccount(accountAddressStr string) (berpctypes.GenericBackendR
 	api.logger.Debug("be_getAccount")
 	return api.backend.GetAccount(accountAddressStr)
 }
+
+func (api *API) GetValidatorAccount(consOrValAddr string) (berpctypes.GenericBackendResponse, error) {
+	api.logger.Debug("be_getValidatorAccount")
+	return api.backend.GetValidatorAccount(consOrValAddr)
+}

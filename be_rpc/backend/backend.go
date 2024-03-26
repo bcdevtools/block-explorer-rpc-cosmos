@@ -24,6 +24,8 @@ type BackendI interface {
 
 	GetAccount(accountAddressStr string) (berpctypes.GenericBackendResponse, error)
 
+	GetValidatorAccount(consOrValAddr string) (berpctypes.GenericBackendResponse, error)
+
 	// Block
 
 	// GetBlockByNumber returns a block by its height.

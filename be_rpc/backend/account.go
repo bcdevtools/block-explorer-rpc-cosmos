@@ -6,7 +6,11 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/pkg/errors"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"strings"
 )
 
@@ -115,6 +119,86 @@ func (m *Backend) GetAccount(accountAddressStr string) (berpctypes.GenericBacken
 			return nil, err
 		}
 		res["staking"] = stakingInfo
+	}
+
+	return res, nil
+}
+
+func (m *Backend) GetValidatorAccount(consOrValAddr string) (berpctypes.GenericBackendResponse, error) {
+	consOrValAddr = berpcutils.NormalizeAddress(consOrValAddr)
+	if !m.bech32Cfg.IsValAddr(consOrValAddr) && !m.bech32Cfg.IsConsAddr(consOrValAddr) {
+		return nil, berpctypes.ErrBadAddress
+	}
+
+	res := make(berpctypes.GenericBackendResponse)
+
+	if m.interceptor != nil {
+		var intercepted bool
+		var err error
+		intercepted, _, res, err = m.interceptor.GetAccount(consOrValAddr)
+		if err != nil {
+			return nil, err
+		}
+		if intercepted {
+			return res, nil
+		}
+		res = res.ReInitializeIfNil()
+	}
+
+	valAddr, consAddr, found, err := m.validatorsConsAddrToValAddr.GetValAddrAndConsAddr(consOrValAddr)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, status.Error(codes.NotFound, "validator could not be found")
+	}
+
+	res["address"] = berpctypes.GenericBackendResponse{
+		"validator_address": valAddr,
+		"consensus_address": consAddr,
+	}
+
+	resValInfo, err := m.queryClient.StakingQueryClient.Validator(m.ctx, &stakingtypes.QueryValidatorRequest{
+		ValidatorAddr: valAddr,
+	})
+	if err != nil {
+		return nil, status.Error(codes.Internal, errors.Wrap(err, "failed to get validator info").Error())
+	}
+
+	validatorInfo := berpctypes.GenericBackendResponse{
+		"jailed":           resValInfo.Validator.Jailed,
+		"status":           resValInfo.Validator.Status.String(),
+		"tokens":           resValInfo.Validator.Tokens.String(),
+		"delegator_shares": resValInfo.Validator.DelegatorShares.String(),
+		"description": berpctypes.GenericBackendResponse{
+			"moniker":          resValInfo.Validator.Description.Moniker,
+			"identity":         resValInfo.Validator.Description.Identity,
+			"website":          resValInfo.Validator.Description.Website,
+			"security_contact": resValInfo.Validator.Description.SecurityContact,
+			"details":          resValInfo.Validator.Description.Details,
+		},
+		"unbonding_height":    resValInfo.Validator.UnbondingHeight,
+		"unbonding_time":      resValInfo.Validator.UnbondingTime,
+		"commission":          resValInfo.Validator.Commission,
+		"min_self_delegation": resValInfo.Validator.MinSelfDelegation.String(),
+	}
+
+	res["validator"] = validatorInfo
+
+	consensusPubKeyMap, err := berpcutils.FromAnyToJsonMap(resValInfo.Validator.ConsensusPubkey, m.clientCtx.Codec)
+	if err == nil {
+		validatorInfo["consensus_pubkey"] = consensusPubKeyMap
+	}
+
+	tmVals, err := m.tendermintValidatorsCache.GetValidators()
+	if err != nil {
+		return nil, status.Error(codes.Internal, errors.Wrap(err, "failed to get validators").Error())
+	}
+	for _, val := range tmVals {
+		if sdk.ConsAddress(val.Address).String() == consAddr {
+			validatorInfo["voting_power"] = val.VotingPower
+			break
+		}
 	}
 
 	return res, nil
