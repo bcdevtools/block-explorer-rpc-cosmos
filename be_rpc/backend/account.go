@@ -6,11 +6,8 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
-	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/pkg/errors"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
+	"strings"
 )
 
 func (m *Backend) GetAccountBalances(accountAddressStr string, denom *string) (berpctypes.GenericBackendResponse, error) {
@@ -46,6 +43,11 @@ func (m *Backend) GetAccountBalances(accountAddressStr string, denom *string) (b
 }
 
 func (m *Backend) GetAccount(accountAddressStr string) (berpctypes.GenericBackendResponse, error) {
+	accountAddressStr = berpcutils.NormalizeAddress(accountAddressStr)
+	if !m.isAccAddrOr0x(accountAddressStr) {
+		return nil, berpctypes.ErrBadAddress
+	}
+
 	res := make(berpctypes.GenericBackendResponse)
 
 	if m.interceptor != nil {
@@ -58,10 +60,7 @@ func (m *Backend) GetAccount(accountAddressStr string) (berpctypes.GenericBacken
 		if intercepted {
 			return res, nil
 		}
-		if res == nil {
-			// re-initialize
-			res = make(berpctypes.GenericBackendResponse)
-		}
+		res = res.ReInitializeIfNil()
 	}
 
 	accAddrStr := m.bech32Cfg.ConvertToAccAddressIfHexOtherwiseKeepAsIs(accountAddressStr)
@@ -71,30 +70,28 @@ func (m *Backend) GetAccount(accountAddressStr string) (berpctypes.GenericBacken
 	}
 	if m.externalServices.ChainType == berpctypes.ChainTypeEvm {
 		accAddr, err := sdk.AccAddressFromBech32(accAddrStr)
-		if err == nil {
-			addressInfo["evm"] = common.BytesToAddress(accAddr.Bytes()).Hex()
+		if err != nil {
+			return nil, berpctypes.ErrBadAddress
 		}
+		addressInfo["evm"] = common.BytesToAddress(accAddr.Bytes()).Hex()
 	}
 
 	res["address"] = addressInfo
 
-	_, isSmartContract := res["contract"]
-	isValidatorAddress := !isSmartContract && m.bech32Cfg.IsValAddr(accAddrStr)
+	_, isSmartContract := res["contract"] // "contract" is a key in the response if the account is a smart contract, returned by EVM interceptor
 
 	// get account balance
 
-	if !isValidatorAddress {
-		balancesInfo, err := m.GetAccountBalances(accAddrStr, nil)
-		if err != nil {
-			return nil, err
-		}
-
-		res["balances"] = balancesInfo
+	balancesInfo, err := m.GetAccountBalances(accAddrStr, nil)
+	if err != nil {
+		return nil, err
 	}
+
+	res["balances"] = balancesInfo
 
 	// get account transaction count
 
-	if !isSmartContract && !isValidatorAddress {
+	if !isSmartContract {
 		resAccount, err := m.queryClient.AuthQueryClient.Account(m.ctx, &authtypes.QueryAccountRequest{
 			Address: accAddrStr,
 		})
@@ -112,7 +109,7 @@ func (m *Backend) GetAccount(accountAddressStr string) (berpctypes.GenericBacken
 
 	// get staking information
 
-	if !isSmartContract && !isValidatorAddress {
+	if !isSmartContract {
 		stakingInfo, err := m.GetStakingInfo(accAddrStr)
 		if err != nil {
 			return nil, err
@@ -120,57 +117,19 @@ func (m *Backend) GetAccount(accountAddressStr string) (berpctypes.GenericBacken
 		res["staking"] = stakingInfo
 	}
 
-	// get validator information
+	return res, nil
+}
 
-	if isValidatorAddress {
-		resValInfo, err := m.queryClient.StakingQueryClient.Validator(m.ctx, &stakingtypes.QueryValidatorRequest{
-			ValidatorAddr: accAddrStr,
-		})
-		if err != nil {
-			return nil, status.Error(codes.Internal, errors.Wrap(err, "failed to get validator info").Error())
-		}
+func (m *Backend) isAccAddrOr0x(addr string) bool {
+	addr = berpcutils.NormalizeAddress(addr)
 
-		validatorInfo := berpctypes.GenericBackendResponse{
-			"operator_address": resValInfo.Validator.OperatorAddress,
-			"jailed":           resValInfo.Validator.Jailed,
-			"status":           resValInfo.Validator.Status.String(),
-			"tokens":           resValInfo.Validator.Tokens.String(),
-			"delegator_shares": resValInfo.Validator.DelegatorShares.String(),
-			"description": berpctypes.GenericBackendResponse{
-				"moniker":          resValInfo.Validator.Description.Moniker,
-				"identity":         resValInfo.Validator.Description.Identity,
-				"website":          resValInfo.Validator.Description.Website,
-				"security_contact": resValInfo.Validator.Description.SecurityContact,
-				"details":          resValInfo.Validator.Description.Details,
-			},
-			"unbonding_height":    resValInfo.Validator.UnbondingHeight,
-			"unbonding_time":      resValInfo.Validator.UnbondingTime,
-			"commission":          resValInfo.Validator.Commission,
-			"min_self_delegation": resValInfo.Validator.MinSelfDelegation.String(),
-		}
-
-		consensusPubKeyMap, err := berpcutils.FromAnyToJsonMap(resValInfo.Validator.ConsensusPubkey, m.clientCtx.Codec)
-		if err == nil {
-			validatorInfo["consensus_pubkey"] = consensusPubKeyMap
-		}
-
-		consAddr, success := berpcutils.FromAnyPubKeyToConsensusAddress(resValInfo.Validator.ConsensusPubkey, m.clientCtx.Codec)
-		if success {
-			validatorInfo["consensus_address"] = consAddr.String()
-			tmVals, err := m.tendermintValidatorsCache.GetValidators()
-			if err != nil {
-				return nil, status.Error(codes.Internal, errors.Wrap(err, "failed to get validators").Error())
-			}
-			for _, val := range tmVals {
-				if sdk.ConsAddress(val.Address).String() == consAddr.String() {
-					validatorInfo["voting_power"] = val.VotingPower
-					break
-				}
-			}
-		}
-
-		res["validator"] = validatorInfo
+	if strings.HasPrefix(addr, "0x") {
+		return true
 	}
 
-	return res, nil
+	if m.bech32Cfg.IsAccountAddr(addr) {
+		return true
+	}
+
+	return false
 }

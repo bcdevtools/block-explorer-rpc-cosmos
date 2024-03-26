@@ -24,3 +24,11 @@ func NewGenericBackendResponseFrom(v any) (res GenericBackendResponse, err error
 
 	return
 }
+
+func (m GenericBackendResponse) ReInitializeIfNil() GenericBackendResponse {
+	if m == nil {
+		return make(GenericBackendResponse)
+	}
+
+	return m
+}

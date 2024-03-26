@@ -179,6 +179,51 @@ func (vc *validatorsConsAddrToValAddr) GetValAddrFromConsAddr(consAddr string) (
 	return
 }
 
+func (vc *validatorsConsAddrToValAddr) GetValAddrAndConsAddr(consOrValAddr string) (valAddr, consAddr string, found bool, err error) {
+	isExpired, errCheckExpired := vc.IsCacheExpired()
+	if errCheckExpired != nil {
+		err = errCheckExpired
+		return
+	}
+
+	lookupUnexpiredData := func() (valAddr, consAddr string, found bool) {
+		for consAddr, valAddr := range vc.validatorsConsAddrToValAddr {
+			if consAddr == consOrValAddr || valAddr == consOrValAddr {
+				return valAddr, consAddr, true
+			}
+		}
+
+		return "", "", false
+	}
+
+	if !isExpired {
+		valAddr, consAddr, found = lookupUnexpiredData()
+		return
+	}
+
+	vc.cacheController.rwMutex.Lock()
+	defer vc.cacheController.rwMutex.Unlock()
+
+	isExpired, height, errCheckExpired := vc.isCacheExpired(false)
+	if errCheckExpired != nil {
+		err = errCheckExpired
+		return
+	}
+	if !isExpired { // prevent race condition by re-checking after acquiring the lock
+		valAddr, consAddr, found = lookupUnexpiredData()
+		return
+	}
+
+	errReloadCache := vc.reloadCacheWithoutLock(height)
+	if errReloadCache != nil {
+		err = errReloadCache
+		return
+	}
+
+	valAddr, consAddr, found = lookupUnexpiredData()
+	return
+}
+
 func (vc *validatorsConsAddrToValAddr) IsCacheExpired() (expired bool, err error) {
 	expired, _, err = vc.isCacheExpired(true)
 	return
