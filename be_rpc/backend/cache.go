@@ -55,9 +55,10 @@ func NewTendermintValidatorsCache(tmClient client.Client) *tendermintValidatorsC
 }
 
 func (vc *tendermintValidatorsCache) GetValidators() (vals []*tmtypes.Validator, err error) {
-	isExpired, err := vc.IsCacheExpired()
-	if err != nil {
-		return nil, err
+	isExpired, errCheckExpired := vc.IsCacheExpired()
+	if errCheckExpired != nil {
+		err = errCheckExpired
+		return
 	}
 
 	if !isExpired {
@@ -67,25 +68,22 @@ func (vc *tendermintValidatorsCache) GetValidators() (vals []*tmtypes.Validator,
 	vc.cacheController.rwMutex.Lock()
 	defer vc.cacheController.rwMutex.Unlock()
 
-	isExpired, height, err := vc.isCacheExpired(false)
+	isExpired, height, errCheckExpired := vc.isCacheExpired(false)
+	if errCheckExpired != nil {
+		err = errCheckExpired
+		return
+	}
 	if !isExpired { // prevent race condition by re-checking after acquiring the lock
 		return vc.validators, nil
 	}
 
-	var page = 1
-	var perPage = 200
-
-	resValidators, err := vc.tmClient.Validators(context.Background(), &height, &page, &perPage)
-	if err != nil {
-		return nil, err
+	errReloadCache := vc.reloadCacheWithoutLock(height)
+	if errReloadCache != nil {
+		err = errReloadCache
+		return
 	}
 
-	validators := resValidators.Validators
-
-	vc.validators = validators
-	vc.cacheController.UpdateExpirationAnchor(height + validatorsCacheExpiration)
-
-	return validators, nil
+	return vc.validators, nil
 }
 
 func (vc *tendermintValidatorsCache) IsCacheExpired() (expired bool, err error) {
@@ -107,6 +105,22 @@ func (vc *tendermintValidatorsCache) isCacheExpired(lock bool) (expired bool, la
 	latestHeight = resStatus.SyncInfo.LatestBlockHeight
 	expired = vc.cacheController.IsExpired(latestHeight)
 	return
+}
+
+// reloadCacheWithoutLock performs reload cache. Lock acquire must be performed before calling this.
+func (vc *tendermintValidatorsCache) reloadCacheWithoutLock(height int64) error {
+	var page = 1
+	var perPage = 200
+
+	resValidators, err := vc.tmClient.Validators(context.Background(), &height, &page, &perPage)
+	if err != nil {
+		return err
+	}
+
+	vc.validators = resValidators.Validators
+	vc.cacheController.UpdateExpirationAnchor(height + validatorsCacheExpiration)
+
+	return nil
 }
 
 type validatorsConsAddrToValAddr struct {
@@ -145,36 +159,21 @@ func (vc *validatorsConsAddrToValAddr) GetValAddrFromConsAddr(consAddr string) (
 	vc.cacheController.rwMutex.Lock()
 	defer vc.cacheController.rwMutex.Unlock()
 
-	isExpired, height, err := vc.isCacheExpired(false)
+	isExpired, height, errCheckExpired := vc.isCacheExpired(false)
+	if errCheckExpired != nil {
+		err = errCheckExpired
+		return
+	}
 	if !isExpired { // prevent race condition by re-checking after acquiring the lock
 		valAddr, found = vc.validatorsConsAddrToValAddr[consAddr]
 		return
 	}
 
-	var perPage = 200
-
-	stakingVals, errStakingVals := vc.stakingQueryClient.Validators(context.Background(), &stakingtypes.QueryValidatorsRequest{
-		Pagination: &query.PageRequest{
-			Offset: 0,
-			Limit:  uint64(perPage),
-		},
-	})
-	if errStakingVals != nil {
-		err = errStakingVals
+	errReloadCache := vc.reloadCacheWithoutLock(height)
+	if errReloadCache != nil {
+		err = errReloadCache
 		return
 	}
-
-	for _, val := range stakingVals.Validators {
-		consAddr, success := berpcutils.FromAnyPubKeyToConsensusAddress(val.ConsensusPubkey, vc.codec)
-		if !success {
-			continue
-		}
-
-		consAddrStr := consAddr.String()
-		vc.validatorsConsAddrToValAddr[consAddrStr] = val.OperatorAddress
-	}
-
-	vc.cacheController.UpdateExpirationAnchor(height + validatorsCacheExpiration)
 
 	valAddr, found = vc.validatorsConsAddrToValAddr[consAddr]
 	return
@@ -199,4 +198,33 @@ func (vc *validatorsConsAddrToValAddr) isCacheExpired(lock bool) (expired bool, 
 	latestHeight = resStatus.SyncInfo.LatestBlockHeight
 	expired = vc.cacheController.IsExpired(latestHeight)
 	return
+}
+
+// reloadCacheWithoutLock performs reload cache. Lock acquire must be performed before calling this.
+func (vc *validatorsConsAddrToValAddr) reloadCacheWithoutLock(height int64) error {
+	var perPage = 200
+
+	stakingVals, errStakingVals := vc.stakingQueryClient.Validators(context.Background(), &stakingtypes.QueryValidatorsRequest{
+		Pagination: &query.PageRequest{
+			Offset: 0,
+			Limit:  uint64(perPage),
+		},
+	})
+	if errStakingVals != nil {
+		return errStakingVals
+	}
+
+	for _, val := range stakingVals.Validators {
+		consAddr, success := berpcutils.FromAnyPubKeyToConsensusAddress(val.ConsensusPubkey, vc.codec)
+		if !success {
+			continue
+		}
+
+		consAddrStr := consAddr.String()
+		vc.validatorsConsAddrToValAddr[consAddrStr] = val.OperatorAddress
+	}
+
+	vc.cacheController.UpdateExpirationAnchor(height + validatorsCacheExpiration)
+
+	return nil
 }
