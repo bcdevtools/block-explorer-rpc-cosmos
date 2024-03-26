@@ -33,6 +33,10 @@ func (m MessageInvolversResult) Add(t InvolversType, addresses ...string) {
 		if len(address) == 0 {
 			continue
 		}
+
+		spl := strings.Split(address, "/") // remove the suffix
+		address = spl[0]
+
 		if _, found := m[t]; found {
 			m[t] = append(m[t], address)
 		} else {
