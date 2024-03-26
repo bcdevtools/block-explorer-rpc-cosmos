@@ -201,6 +201,12 @@ func (m *Backend) GetValidatorAccount(consOrValAddr string) (berpctypes.GenericB
 		}
 	}
 
+	stakingInfo, err := m.GetStakingInfo(valAddr)
+	if err != nil {
+		return nil, err
+	}
+	res["staking"] = stakingInfo
+
 	return res, nil
 }
 
