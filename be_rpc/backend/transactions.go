@@ -1337,10 +1337,9 @@ func (m *Backend) defaultMessageInvolversExtractor(msg sdk.Msg, tx *tx.Tx, tmTx 
 				),
 			)
 		}
-		accAddrBech32Prefix := sdk.GetConfig().GetBech32AccountAddrPrefix() + "1"
 		for _, event := range resTxResult.TxResult.Events {
 			for _, attribute := range event.Attributes {
-				if strings.HasPrefix(string(attribute.Value), accAddrBech32Prefix) {
+				if m.bech32Cfg.IsAccountAddr(string(attribute.Value)) {
 					res.Add(berpctypes.MessageInvolvers, string(attribute.Value))
 				}
 			}

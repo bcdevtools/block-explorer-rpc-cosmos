@@ -2,7 +2,6 @@ package backend
 
 import (
 	berpctypes "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/types"
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	disttypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
 	govv1types "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
@@ -46,9 +45,9 @@ func (m *Backend) GetChainInfo() (berpctypes.GenericBackendResponse, error) {
 		"latestBlock":             statusInfo.SyncInfo.LatestBlockHeight,
 		"latestBlockTimeEpochUTC": statusInfo.SyncInfo.LatestBlockTime.UTC().Unix(),
 		"bech32": map[string]string{
-			"addr": sdk.GetConfig().GetBech32AccountAddrPrefix(),
-			"val":  sdk.GetConfig().GetBech32ValidatorAddrPrefix(),
-			"cons": sdk.GetConfig().GetBech32ConsensusAddrPrefix(),
+			"addr": m.bech32Cfg.GetBech32AccountAddrPrefix(),
+			"val":  m.bech32Cfg.GetBech32ValidatorAddrPrefix(),
+			"cons": m.bech32Cfg.GetBech32ConsensusAddrPrefix(),
 		},
 		"denoms": denoms,
 	}, nil

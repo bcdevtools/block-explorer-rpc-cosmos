@@ -11,11 +11,10 @@ import (
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"strings"
 )
 
 func (m *Backend) GetAccountBalances(accountAddressStr string, denom *string) (berpctypes.GenericBackendResponse, error) {
-	accAddrStr := berpcutils.ConvertToAccAddressIfHexOtherwiseKeepAsIs(accountAddressStr)
+	accAddrStr := m.bech32Cfg.ConvertToAccAddressIfHexOtherwiseKeepAsIs(accountAddressStr)
 
 	if denom == nil || len(*denom) == 0 {
 		resAllBalances, err := m.queryClient.BankQueryClient.AllBalances(m.ctx, &banktypes.QueryAllBalancesRequest{
@@ -65,7 +64,7 @@ func (m *Backend) GetAccount(accountAddressStr string) (berpctypes.GenericBacken
 		}
 	}
 
-	accAddrStr := berpcutils.ConvertToAccAddressIfHexOtherwiseKeepAsIs(accountAddressStr)
+	accAddrStr := m.bech32Cfg.ConvertToAccAddressIfHexOtherwiseKeepAsIs(accountAddressStr)
 
 	addressInfo := berpctypes.GenericBackendResponse{
 		"cosmos": accAddrStr,
@@ -80,7 +79,7 @@ func (m *Backend) GetAccount(accountAddressStr string) (berpctypes.GenericBacken
 	res["address"] = addressInfo
 
 	_, isSmartContract := res["contract"]
-	isValidatorAddress := !isSmartContract && strings.HasPrefix(accAddrStr, sdk.GetConfig().GetBech32ValidatorAddrPrefix()+"1")
+	isValidatorAddress := !isSmartContract && m.bech32Cfg.IsValAddr(accAddrStr)
 
 	// get account balance
 

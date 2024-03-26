@@ -84,6 +84,7 @@ type Backend struct {
 	externalServices           berpctypes.ExternalServices
 
 	// cache
+	bech32Cfg                   berpctypes.Bech32Config
 	tendermintValidatorsCache   *tendermintValidatorsCache
 	validatorsConsAddrToValAddr *validatorsConsAddrToValAddr
 }
@@ -112,6 +113,9 @@ func NewBackend(
 		messageParsers:             messageParsers,
 		messageInvolversExtractors: messageInvolversExtractors,
 		externalServices:           externalServices,
+
+		// cache
+		bech32Cfg: berpctypes.NewBech32Config(),
 		tendermintValidatorsCache: NewTendermintValidatorsCache(
 			clientCtx.Client,
 		),

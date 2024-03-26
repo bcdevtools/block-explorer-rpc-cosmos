@@ -2,7 +2,6 @@ package backend
 
 import (
 	berpctypes "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/types"
-	berpcutils "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/utils"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	disttypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
@@ -14,7 +13,7 @@ import (
 
 func (m *Backend) GetStakingInfo(delegatorAddr string) (berpctypes.GenericBackendResponse, error) {
 	delegatorAddr = strings.ToLower(strings.TrimSpace(delegatorAddr))
-	unsafeDelegatorAddr := berpcutils.FromAnyToBech32AddressUnsafe(delegatorAddr)
+	unsafeDelegatorAddr := m.bech32Cfg.FromAnyToBech32AccountAddrUnsafe(delegatorAddr)
 
 	resDd, err := m.queryClient.StakingQueryClient.DelegatorDelegations(m.ctx, &stakingtypes.QueryDelegatorDelegationsRequest{
 		DelegatorAddr: unsafeDelegatorAddr,
@@ -33,7 +32,7 @@ func (m *Backend) GetStakingInfo(delegatorAddr string) (berpctypes.GenericBacken
 	validatorCommission := sdk.DecCoins{}
 	validatorOutstandingRewards := sdk.DecCoins{}
 
-	isValidatorAddress := strings.HasPrefix(delegatorAddr, sdk.GetConfig().GetBech32ValidatorAddrPrefix()+"1")
+	isValidatorAddress := m.bech32Cfg.IsValAddr(delegatorAddr)
 	if isValidatorAddress {
 		resCom, err := m.queryClient.DistributionQueryClient.ValidatorCommission(m.ctx, &disttypes.QueryValidatorCommissionRequest{
 			ValidatorAddress: delegatorAddr,
