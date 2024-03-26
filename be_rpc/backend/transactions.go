@@ -201,7 +201,8 @@ func (m *Backend) GetTransactionByHash(hashStr string) (berpctypes.GenericBacken
 		"hash":   txRes.TxHash,
 		"msgs":   msgsInfo,
 		"result": berpctypes.GenericBackendResponse{
-			"code": txRes.Code,
+			"code":    txRes.Code,
+			"success": txRes.Code == 0,
 			"gas": berpctypes.GenericBackendResponse{
 				"limit": txRes.GasWanted,
 				"used":  txRes.GasUsed,
