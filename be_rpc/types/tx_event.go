@@ -40,9 +40,21 @@ func (m TxEvents) RemoveUnnecessaryEvmTxEvents() TxEvents {
 	remove := func() TxEvents {
 		txEventsTruncatedEvm := make([]TxEvent, 0)
 		for _, event := range m {
-			// remove unnecessary events
-
+			// keep only necessary events
 			if event.Type == EventTypeEthereumTx {
+				txEventAttrTruncatedEvm := make([]TxEventAttribute, 0)
+				for _, attribute := range event.Attributes {
+					if attribute.Key == AttributeKeyEthereumTxFailed {
+						txEventAttrTruncatedEvm = append(txEventAttrTruncatedEvm, attribute)
+					}
+				}
+
+				if len(txEventAttrTruncatedEvm) > 0 {
+					txEventsTruncatedEvm = append(txEventsTruncatedEvm, TxEvent{
+						Type:       EventTypeEthereumTx,
+						Attributes: txEventAttrTruncatedEvm,
+					})
+				}
 				continue
 			}
 
