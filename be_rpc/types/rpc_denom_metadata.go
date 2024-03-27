@@ -4,7 +4,7 @@ import banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 
 type RpcDenomMetadata struct {
 	// denom_units represents the list of DenomUnit's for a given coin
-	DenomUnits []RpcDenomMetadataUnit `json:"denom_units,omitempty"`
+	DenomUnits []RpcDenomMetadataUnit `json:"denomUnits,omitempty"`
 	// base represents the base denom (should be the DenomUnit with exponent = 0).
 	Base string `json:"base"`
 	// name defines the name of the token (eg: Cosmos Atom)
@@ -12,6 +12,12 @@ type RpcDenomMetadata struct {
 	// symbol is the token symbol usually shown on exchanges (eg: ATOM). This can
 	// be the same as the display.
 	Symbol string `json:"symbol"`
+
+	// Extra fields
+
+	// Highest exponent is an additional field to the metadata that is used to represent the highest available exponent
+	// among all the denom units. This is used to determine the precision of the token.
+	HighestExponent uint32 `json:"highestExponent"`
 }
 
 type RpcDenomMetadataUnit struct {
@@ -27,17 +33,23 @@ type RpcDenomMetadataUnit struct {
 
 func NewRpcDenomMetadataFromBankMetadata(metadata banktypes.Metadata) RpcDenomMetadata {
 	denomUnits := make([]RpcDenomMetadataUnit, len(metadata.DenomUnits))
+	var highestExponent uint32
 	for i, unit := range metadata.DenomUnits {
 		denomUnits[i] = RpcDenomMetadataUnit{
 			Denom:    unit.Denom,
 			Exponent: unit.Exponent,
 		}
+
+		if unit.Exponent > highestExponent {
+			highestExponent = unit.Exponent
+		}
 	}
 
 	res := RpcDenomMetadata{
-		DenomUnits: denomUnits,
-		Base:       metadata.Base,
-		Symbol:     metadata.Symbol,
+		DenomUnits:      denomUnits,
+		Base:            metadata.Base,
+		Symbol:          metadata.Symbol,
+		HighestExponent: highestExponent,
 	}
 
 	if metadata.Display != "" {
