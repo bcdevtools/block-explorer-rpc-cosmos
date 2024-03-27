@@ -92,10 +92,10 @@ func (m *Backend) GetValidators() (berpctypes.GenericBackendResponse, error) {
 			return nil, status.Error(codes.Internal, errors.Wrap(err, "failed to get valiator address from consensus address").Error())
 		}
 		res[consAddr] = map[string]any{
-			"cons_address": consAddr,
-			"val_address":  valAddr,
-			"pubKey_type":  validator.PubKey.Type(),
-			"voting_power": validator.VotingPower,
+			"consAddress": consAddr,
+			"valAddress":  valAddr,
+			"pubKeyType":  validator.PubKey.Type(),
+			"votingPower": validator.VotingPower,
 		}
 	}
 

@@ -104,7 +104,7 @@ func (m *Backend) GetAccount(accountAddressStr string) (berpctypes.GenericBacken
 			fakeBaseAccount := &berpctypes.FakeBaseAccount{}
 			extractedSuccess, err := fakeBaseAccount.TryUnmarshalFromProto(resAccount.Account, m.clientCtx.Codec)
 			if err == nil && extractedSuccess {
-				res["txs_count"] = fakeBaseAccount.Sequence + 1
+				res["txsCount"] = fakeBaseAccount.Sequence + 1
 			} else if err != nil {
 				m.GetLogger().Error("failed to extract base account", "error", err)
 			}
@@ -154,8 +154,8 @@ func (m *Backend) GetValidatorAccount(consOrValAddr string) (berpctypes.GenericB
 	}
 
 	res["address"] = berpctypes.GenericBackendResponse{
-		"validator_address": valAddr,
-		"consensus_address": consAddr,
+		"validatorAddress": valAddr,
+		"consensusAddress": consAddr,
 	}
 
 	resValInfo, err := m.queryClient.StakingQueryClient.Validator(m.ctx, &stakingtypes.QueryValidatorRequest{
@@ -166,10 +166,10 @@ func (m *Backend) GetValidatorAccount(consOrValAddr string) (berpctypes.GenericB
 	}
 
 	validatorInfo := berpctypes.GenericBackendResponse{
-		"jailed":           resValInfo.Validator.Jailed,
-		"status":           resValInfo.Validator.Status.String(),
-		"tokens":           resValInfo.Validator.Tokens.String(),
-		"delegator_shares": resValInfo.Validator.DelegatorShares.String(),
+		"jailed":          resValInfo.Validator.Jailed,
+		"status":          resValInfo.Validator.Status.String(),
+		"tokens":          resValInfo.Validator.Tokens.String(),
+		"delegatorShares": resValInfo.Validator.DelegatorShares.String(),
 		"description": berpctypes.GenericBackendResponse{
 			"moniker":          resValInfo.Validator.Description.Moniker,
 			"identity":         resValInfo.Validator.Description.Identity,
@@ -177,17 +177,17 @@ func (m *Backend) GetValidatorAccount(consOrValAddr string) (berpctypes.GenericB
 			"security_contact": resValInfo.Validator.Description.SecurityContact,
 			"details":          resValInfo.Validator.Description.Details,
 		},
-		"unbonding_height":    resValInfo.Validator.UnbondingHeight,
-		"unbonding_time":      resValInfo.Validator.UnbondingTime,
-		"commission":          resValInfo.Validator.Commission,
-		"min_self_delegation": resValInfo.Validator.MinSelfDelegation.String(),
+		"unbondingHeight":   resValInfo.Validator.UnbondingHeight,
+		"unbondingTime":     resValInfo.Validator.UnbondingTime,
+		"commission":        resValInfo.Validator.Commission,
+		"minSelfDelegation": resValInfo.Validator.MinSelfDelegation.String(),
 	}
 
 	res["validator"] = validatorInfo
 
 	consensusPubKeyMap, err := berpcutils.FromAnyToJsonMap(resValInfo.Validator.ConsensusPubkey, m.clientCtx.Codec)
 	if err == nil {
-		validatorInfo["consensus_pubkey"] = consensusPubKeyMap
+		validatorInfo["consensusPubkey"] = consensusPubKeyMap
 	}
 
 	tmVals, err := m.tendermintValidatorsCache.GetValidators()
@@ -196,7 +196,7 @@ func (m *Backend) GetValidatorAccount(consOrValAddr string) (berpctypes.GenericB
 	}
 	for _, val := range tmVals {
 		if sdk.ConsAddress(val.Address).String() == consAddr {
-			validatorInfo["voting_power"] = val.VotingPower
+			validatorInfo["votingPower"] = val.VotingPower
 			break
 		}
 	}

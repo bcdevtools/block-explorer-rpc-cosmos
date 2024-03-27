@@ -208,7 +208,7 @@ func (m *Backend) GetTransactionByHash(hashStr string) (berpctypes.GenericBacken
 
 		parsedContent, err := messageParser(cosmosMsg, uint(msgIdx), tx, txRes)
 		if err != nil {
-			msgInfo["content_error"] = err.Error()
+			msgInfo["contentError"] = err.Error()
 		} else {
 			msgInfo["content"] = parsedContent
 		}
@@ -216,9 +216,9 @@ func (m *Backend) GetTransactionByHash(hashStr string) (berpctypes.GenericBacken
 		{
 			msgContent, err := berpcutils.FromAnyToJsonMap(msg, m.clientCtx.Codec)
 			if err != nil {
-				msgInfo["proto_content_error"] = err.Error()
+				msgInfo["protoContentError"] = err.Error()
 			} else {
-				msgInfo["proto_content"] = msgContent
+				msgInfo["protoContent"] = msgContent
 			}
 		}
 	}

@@ -66,9 +66,9 @@ func proposalToMap(proposal *govv1types.Proposal, codec codec.Codec) map[string]
 			{
 				msgContent, err := berpcutils.FromAnyToJsonMap(msg, codec)
 				if err != nil {
-					message["proto_content_error"] = err.Error()
+					message["protoContentError"] = err.Error()
 				} else {
-					message["proto_content"] = msgContent
+					message["protoContent"] = msgContent
 				}
 			}
 
