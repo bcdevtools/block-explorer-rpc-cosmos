@@ -33,12 +33,21 @@ import (
 var patternTxHash = regexp.MustCompile(`^(0[xX])?[\da-fA-F]{64}$`)
 
 func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightIncluded int64) (berpctypes.GenericBackendResponse, error) {
+	if toHeightIncluded == 0 {
+		toHeightIncluded = fromHeightIncluded
+	}
 	if fromHeightIncluded <= 0 || toHeightIncluded <= 0 || fromHeightIncluded > toHeightIncluded {
 		return nil, berpctypes.ErrBadRequest
 	}
 
-	if toHeightIncluded-fromHeightIncluded+1 > 100 {
-		return nil, berpctypes.ErrBadPageSize
+	res := make(berpctypes.GenericBackendResponse)
+
+	const maxPageSize = 100
+
+	if toHeightIncluded-fromHeightIncluded+1 > maxPageSize {
+		originalToHeightIncluded := toHeightIncluded
+		toHeightIncluded = fromHeightIncluded + maxPageSize - 1
+		res["skippedBlockRange"] = []int64{toHeightIncluded + 1, originalToHeightIncluded}
 	}
 
 	statusInfo, err := m.clientCtx.Client.Status(m.ctx)
@@ -46,9 +55,10 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	res := berpctypes.GenericBackendResponse{
-		"chainId": statusInfo.NodeInfo.Network,
-	}
+	res["chainId"] = statusInfo.NodeInfo.Network
+
+	missingBlocks := make(berpctypes.Tracker[int64])
+	errorBlocks := make(berpctypes.Tracker[int64])
 
 	txsByBlock := make(map[int64]map[string]any)
 	for height := fromHeightIncluded; height <= toHeightIncluded; height++ {
@@ -56,10 +66,14 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 			Height: height,
 		})
 		if err != nil {
-			return nil, status.Error(codes.Internal, err.Error())
+			m.GetLogger().Error("failed to get block", "height", height, "error", err)
+			missingBlocks.Add(height)
+			continue
 		}
 		if resBlock == nil {
-			return nil, status.Error(codes.NotFound, "block not found")
+			m.GetLogger().Error("block not found", "height", height)
+			missingBlocks.Add(height)
+			continue
 		}
 
 		var txsInfo []map[string]any
@@ -92,7 +106,9 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 				var cosmosMsg sdk.Msg
 				err := m.clientCtx.Codec.UnpackAny(msg, &cosmosMsg)
 				if err != nil {
-					return nil, status.Error(codes.Internal, errors.Wrapf(err, "failed to unpack message").Error())
+					errorBlocks.Add(height)
+					m.GetLogger().Error("failed to unpack message", "error", err)
+					break
 				}
 
 				var messageInvolversExtractor berpctypes.MessageInvolversExtractor
@@ -116,6 +132,10 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 			})
 		}
 
+		if errorBlocks.Has(height) {
+			continue
+		}
+
 		txsByBlock[height] = map[string]any{
 			"timeEpochUTC": resBlock.Block.Header.Time.UTC().Unix(),
 			"txs":          txsInfo,
@@ -123,6 +143,13 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 	}
 
 	res["blocks"] = txsByBlock
+
+	if len(missingBlocks) > 0 {
+		res["missingBlocks"] = missingBlocks.ToSortedSlice()
+	}
+	if len(errorBlocks) > 0 {
+		res["errorBlocks"] = errorBlocks.ToSortedSlice()
+	}
 
 	return res, nil
 }
