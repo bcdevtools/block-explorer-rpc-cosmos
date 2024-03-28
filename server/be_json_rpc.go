@@ -10,6 +10,7 @@ import (
 	"golang.org/x/net/netutil"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -63,7 +64,18 @@ func StartBeJsonRPC(ctx *server.Context,
 	}
 
 	r := mux.NewRouter()
-	r.HandleFunc("/", rpcServer.ServeHTTP).Methods("POST")
+
+	var handlerFunc func(http.ResponseWriter, *http.Request)
+	if config.EnableUnsafeCORS {
+		handlerFunc = func(writer http.ResponseWriter, request *http.Request) {
+			addCorsHeaders(request.Method, writer)
+			rpcServer.ServeHTTP(writer, request)
+		}
+	} else {
+		handlerFunc = rpcServer.ServeHTTP
+	}
+
+	r.HandleFunc("/", handlerFunc).Methods("POST")
 
 	handlerWithCors := cors.Default()
 	if config.EnableUnsafeCORS {
@@ -151,4 +163,16 @@ func connectTmWS(tmRPCAddr, tmEndpoint string, logger tmlog.Logger) *rpcclient.W
 	}
 
 	return tmWsClient
+}
+
+func addCorsHeaders(httpMethod string, responseWriter http.ResponseWriter) {
+	httpMethod = strings.ToUpper(httpMethod)
+
+	if httpMethod == http.MethodPost {
+		responseWriter.Header().Set("Access-Control-Allow-Origin", "*")
+		responseWriter.Header().Set("Access-Control-Allow-Methods", "POST")
+		responseWriter.Header().Set("Access-Control-Allow-Headers", "DNT,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Origin,Accept,X-Server-Time")
+	}
+
+	return
 }
