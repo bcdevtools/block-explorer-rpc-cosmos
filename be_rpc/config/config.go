@@ -23,6 +23,8 @@ type BeJsonRpcConfig struct {
 	// MaxOpenConnections sets the maximum number of simultaneous connections
 	// for the server listener.
 	MaxOpenConnections int `mapstructure:"max-open-connections"`
+	// EnableUnsafeCORS defines if the server should allow unsafe CORS requests.
+	EnableUnsafeCORS bool `mapstructure:"-"`
 }
 
 // DefaultBeJsonRpcConfig returns Block Explorer JSON-RPC API config enabled by default
@@ -34,6 +36,7 @@ func DefaultBeJsonRpcConfig() *BeJsonRpcConfig {
 		HTTPTimeout:        DefaultHTTPTimeout,
 		HTTPIdleTimeout:    DefaultHTTPIdleTimeout,
 		MaxOpenConnections: DefaultMaxOpenConnections,
+		EnableUnsafeCORS:   false,
 	}
 }
 
@@ -59,6 +62,7 @@ func GetConfig(v *viper.Viper) (BeJsonRpcConfig, error) {
 		HTTPTimeout:        v.GetDuration(FlagBeJsonRpcHttpTimeout),
 		HTTPIdleTimeout:    v.GetDuration(FlagBeJsonRpcHttpIdleTimeout),
 		MaxOpenConnections: v.GetInt(FlagBeJsonRpcHttpTimeout),
+		EnableUnsafeCORS:   false,
 	}
 
 	return cfg, cfg.Validate()

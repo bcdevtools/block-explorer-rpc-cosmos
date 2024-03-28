@@ -66,7 +66,9 @@ func StartBeJsonRPC(ctx *server.Context,
 	r.HandleFunc("/", rpcServer.ServeHTTP).Methods("POST")
 
 	handlerWithCors := cors.Default()
-	handlerWithCors = cors.AllowAll()
+	if config.EnableUnsafeCORS {
+		handlerWithCors = cors.AllowAll()
+	}
 
 	httpSrv := &http.Server{
 		Addr:              config.Address,
