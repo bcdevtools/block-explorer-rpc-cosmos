@@ -3,20 +3,21 @@ package config
 import (
 	"errors"
 	"github.com/spf13/cobra"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/viper"
 )
 
-// BeJsonRpcConfig defines configuration for the BE-RPC server.
+// BeJsonRpcConfig defines configuration for the Block Explorer Json-RPC server.
 type BeJsonRpcConfig struct {
-	// Address defines the HTTP server to listen on
-	Address string `mapstructure:"address"`
 	// Enable defines if the Be Json RPC server should be enabled.
 	Enable bool `mapstructure:"enable"`
-	// HTTPTimeout is the read/write timeout of http json-rpc server.
+	// Address defines the HTTP server to listen on
+	Address string `mapstructure:"address"`
+	// HTTPTimeout is the http read/write timeout of Block Explorer Json-RPC server.
 	HTTPTimeout time.Duration `mapstructure:"http-timeout"`
-	// HTTPIdleTimeout is the idle timeout of http json-rpc server.
+	// HTTPIdleTimeout is the http idle timeout of Block Explorer Json-RPC server.
 	HTTPIdleTimeout time.Duration `mapstructure:"http-idle-timeout"`
 	// MaxOpenConnections sets the maximum number of simultaneous connections
 	// for the server listener.
@@ -73,4 +74,38 @@ func AddBeJsonRpcFlags(cmd *cobra.Command) {
 	cmd.Flags().Duration(FlagBeJsonRpcHttpIdleTimeout, DefaultHTTPIdleTimeout, "sets an idle timeout for Block Explorer Json-RPC http server (0 is no timeout)")
 	cmd.Flags().Duration(FlagBeJsonRpcMaxOpenConnection, DefaultMaxOpenConnections, "sets maximum open connection for Block Explorer Json-RPC http server (0 is unlimited)")
 	cmd.Flags().Bool(FlagBeJsonRpcAllowCORS, DefaultAllowCORS, "define if the Block Explorer Json-RPC should allow CORS requests")
+}
+
+// GetViperConfig reads configuration parameters from Viper instance.
+func (c *BeJsonRpcConfig) GetViperConfig(cmd *cobra.Command, homeDir string) error {
+	v := viper.GetViper()
+
+	//Loads toml config file
+	EnsureRoot(homeDir, nil)
+	v.SetConfigName(DefaultConfigName)
+	v.AddConfigPath(filepath.Join(homeDir, DefaultConfigDirName)) // search root directory /config
+
+	// bind flags so we could override config file with flags
+	err := bindFlagsToViper(cmd, v)
+	if err != nil {
+		return err
+	}
+
+	// Read viper config
+	err = v.ReadInConfig()
+	if err != nil {
+		return err
+	}
+
+	err = viper.Unmarshal(&c)
+	if err != nil {
+		return err
+	}
+
+	err = c.Validate()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
