@@ -16,7 +16,7 @@ const (
 	DefaultEnable = true
 
 	// DefaultJSONRPCAddress is the default address the BE-JSON-RPC server binds to.
-	DefaultJSONRPCAddress = "127.0.0.1:11100"
+	DefaultJSONRPCAddress = "0.0.0.0:11100"
 
 	// DefaultHTTPTimeout is the default read/write timeout of the http be-json-rpc server
 	DefaultHTTPTimeout = 30 * time.Second
