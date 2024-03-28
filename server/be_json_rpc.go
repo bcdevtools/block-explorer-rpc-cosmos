@@ -25,7 +25,8 @@ import (
 
 // StartBeJsonRPC starts the BE-JSON-RPC server.
 // Legacy TODO BE: call to this function to start server
-func StartBeJsonRPC(ctx *server.Context,
+func StartBeJsonRPC(
+	ctx *server.Context,
 	clientCtx client.Context,
 	tmRPCAddr,
 	tmEndpoint string,
@@ -63,24 +64,23 @@ func StartBeJsonRPC(ctx *server.Context,
 		}
 	}
 
-	r := mux.NewRouter()
+	ctx.Logger.Info("Block Explorer Json-RPC server configuration", "enable", config.Enable, "address", config.Address, "allow_cors", config.AllowCORS)
 
 	var handlerFunc func(http.ResponseWriter, *http.Request)
+	var handlerWithCors *cors.Cors
 	if config.AllowCORS {
 		handlerFunc = func(writer http.ResponseWriter, request *http.Request) {
 			addCorsHeaders(request.Method, writer)
 			rpcServer.ServeHTTP(writer, request)
 		}
+		handlerWithCors = cors.AllowAll()
 	} else {
 		handlerFunc = rpcServer.ServeHTTP
+		handlerWithCors = cors.Default()
 	}
 
+	r := mux.NewRouter()
 	r.HandleFunc("/", handlerFunc).Methods("POST")
-
-	handlerWithCors := cors.Default()
-	if config.AllowCORS {
-		handlerWithCors = cors.AllowAll()
-	}
 
 	httpSrv := &http.Server{
 		Addr:              config.Address,

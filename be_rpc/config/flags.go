@@ -3,12 +3,12 @@ package config
 import "time"
 
 const (
-	FlagBeJsonRpcEnable            = "be-json-rpc.enable"
-	FlagBeJsonRpcAddress           = "be-json-rpc.address"
-	FlagBeJsonRpcHttpTimeout       = "be-json-rpc.http-timeout"
-	FlagBeJsonRpcHttpIdleTimeout   = "be-json-rpc.http-idle-timeout"
-	FlagBeJsonRpcMaxOpenConnection = "be-json-rpc.max-open-connections"
-	FlagBeJsonRpcAllowCORS         = "be-json-rpc.allow-cors"
+	FlagBeJsonRpcEnable            = "be.enable"
+	FlagBeJsonRpcAddress           = "be.address"
+	FlagBeJsonRpcHttpTimeout       = "be.http-timeout"
+	FlagBeJsonRpcHttpIdleTimeout   = "be.http-idle-timeout"
+	FlagBeJsonRpcMaxOpenConnection = "be.max-open-connections"
+	FlagBeJsonRpcAllowCORS         = "be.allow-cors"
 )
 
 const (

@@ -25,7 +25,7 @@ type BeJsonRpcConfig struct {
 	AllowCORS bool `mapstructure:"allow-cors"`
 }
 
-// DefaultBeJsonRpcConfig returns Block Explorer JSON-RPC API config enabled by default
+// DefaultBeJsonRpcConfig returns Block Explorer JSON-RPC API config with default values
 func DefaultBeJsonRpcConfig() *BeJsonRpcConfig {
 	return &BeJsonRpcConfig{
 		Enable:             DefaultEnable,
@@ -57,7 +57,7 @@ func GetConfig(v *viper.Viper) (BeJsonRpcConfig, error) {
 		Address:            v.GetString(FlagBeJsonRpcAddress),
 		HTTPTimeout:        v.GetDuration(FlagBeJsonRpcHttpTimeout),
 		HTTPIdleTimeout:    v.GetDuration(FlagBeJsonRpcHttpIdleTimeout),
-		MaxOpenConnections: v.GetInt(FlagBeJsonRpcHttpTimeout),
+		MaxOpenConnections: v.GetInt(FlagBeJsonRpcMaxOpenConnection),
 		AllowCORS:          v.GetBool(FlagBeJsonRpcAllowCORS),
 	}
 
@@ -67,10 +67,10 @@ func GetConfig(v *viper.Viper) (BeJsonRpcConfig, error) {
 // AddBeJsonRpcFlags add Block Explorer Json-RPC flags into the cmd
 // Legacy TODO BE: call this to register flags
 func AddBeJsonRpcFlags(cmd *cobra.Command) {
-	cmd.Flags().Bool(FlagBeJsonRpcEnable, true, "define if the Block Explorer JSON-RPC server should be enabled")
-	cmd.Flags().String(FlagBeJsonRpcAddress, DefaultJSONRPCAddress, "the Block Explorer JSON-RPC server address to listen on")
-	cmd.Flags().Duration(FlagBeJsonRpcHttpTimeout, DefaultHTTPTimeout, "Sets a read/write timeout for block explorer json-rpc http server (0=infinite)")
-	cmd.Flags().Duration(FlagBeJsonRpcHttpIdleTimeout, DefaultHTTPIdleTimeout, "Sets a idle timeout for block explorer json-rpc http server (0=infinite)")
-	cmd.Flags().Duration(FlagBeJsonRpcMaxOpenConnection, DefaultMaxOpenConnections, "Maximum open connection for block explorer json-rpc http server")
-	cmd.Flags().Bool(FlagBeJsonRpcAllowCORS, DefaultAllowCORS, "Allow CORS requests")
+	cmd.Flags().Bool(FlagBeJsonRpcEnable, DefaultEnable, "define if the Block Explorer Json-RPC server should be enabled")
+	cmd.Flags().String(FlagBeJsonRpcAddress, DefaultJSONRPCAddress, "define the address for the Block Explorer Json-RPC server to listen on")
+	cmd.Flags().Duration(FlagBeJsonRpcHttpTimeout, DefaultHTTPTimeout, "sets a read/write timeout for Block Explorer Json-RPC http server (0 is no timeout)")
+	cmd.Flags().Duration(FlagBeJsonRpcHttpIdleTimeout, DefaultHTTPIdleTimeout, "sets an idle timeout for Block Explorer Json-RPC http server (0 is no timeout)")
+	cmd.Flags().Duration(FlagBeJsonRpcMaxOpenConnection, DefaultMaxOpenConnections, "sets maximum open connection for Block Explorer Json-RPC http server (0 is unlimited)")
+	cmd.Flags().Bool(FlagBeJsonRpcAllowCORS, DefaultAllowCORS, "define if the Block Explorer Json-RPC should allow CORS requests")
 }
