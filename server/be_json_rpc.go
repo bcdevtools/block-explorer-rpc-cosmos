@@ -66,7 +66,7 @@ func StartBeJsonRPC(ctx *server.Context,
 	r := mux.NewRouter()
 
 	var handlerFunc func(http.ResponseWriter, *http.Request)
-	if config.EnableUnsafeCORS {
+	if config.AllowCORS {
 		handlerFunc = func(writer http.ResponseWriter, request *http.Request) {
 			addCorsHeaders(request.Method, writer)
 			rpcServer.ServeHTTP(writer, request)
@@ -78,7 +78,7 @@ func StartBeJsonRPC(ctx *server.Context,
 	r.HandleFunc("/", handlerFunc).Methods("POST")
 
 	handlerWithCors := cors.Default()
-	if config.EnableUnsafeCORS {
+	if config.AllowCORS {
 		handlerWithCors = cors.AllowAll()
 	}
 

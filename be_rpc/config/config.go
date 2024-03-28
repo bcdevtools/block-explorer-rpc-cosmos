@@ -12,8 +12,6 @@ import (
 type BeJsonRpcConfig struct {
 	// Address defines the HTTP server to listen on
 	Address string `mapstructure:"address"`
-	// WsAddress defines the WebSocket server to listen on
-	WsAddress string `mapstructure:"ws-address"`
 	// Enable defines if the Be Json RPC server should be enabled.
 	Enable bool `mapstructure:"enable"`
 	// HTTPTimeout is the read/write timeout of http json-rpc server.
@@ -23,20 +21,19 @@ type BeJsonRpcConfig struct {
 	// MaxOpenConnections sets the maximum number of simultaneous connections
 	// for the server listener.
 	MaxOpenConnections int `mapstructure:"max-open-connections"`
-	// EnableUnsafeCORS defines if the server should allow unsafe CORS requests.
-	EnableUnsafeCORS bool `mapstructure:"-"`
+	// AllowCORS defines if the server should allow CORS requests. Allowed by default.
+	AllowCORS bool `mapstructure:"allow-cors"`
 }
 
 // DefaultBeJsonRpcConfig returns Block Explorer JSON-RPC API config enabled by default
 func DefaultBeJsonRpcConfig() *BeJsonRpcConfig {
 	return &BeJsonRpcConfig{
-		Enable:             true,
+		Enable:             DefaultEnable,
 		Address:            DefaultJSONRPCAddress,
-		WsAddress:          DefaultJSONRPCWsAddress,
 		HTTPTimeout:        DefaultHTTPTimeout,
 		HTTPIdleTimeout:    DefaultHTTPIdleTimeout,
 		MaxOpenConnections: DefaultMaxOpenConnections,
-		EnableUnsafeCORS:   false,
+		AllowCORS:          DefaultAllowCORS,
 	}
 }
 
@@ -58,11 +55,10 @@ func GetConfig(v *viper.Viper) (BeJsonRpcConfig, error) {
 	cfg := BeJsonRpcConfig{
 		Enable:             v.GetBool(FlagBeJsonRpcEnable),
 		Address:            v.GetString(FlagBeJsonRpcAddress),
-		WsAddress:          v.GetString(FlagBeJsonRpcWsAddress),
 		HTTPTimeout:        v.GetDuration(FlagBeJsonRpcHttpTimeout),
 		HTTPIdleTimeout:    v.GetDuration(FlagBeJsonRpcHttpIdleTimeout),
 		MaxOpenConnections: v.GetInt(FlagBeJsonRpcHttpTimeout),
-		EnableUnsafeCORS:   false,
+		AllowCORS:          v.GetBool(FlagBeJsonRpcAllowCORS),
 	}
 
 	return cfg, cfg.Validate()
@@ -73,8 +69,8 @@ func GetConfig(v *viper.Viper) (BeJsonRpcConfig, error) {
 func AddBeJsonRpcFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool(FlagBeJsonRpcEnable, true, "define if the Block Explorer JSON-RPC server should be enabled")
 	cmd.Flags().String(FlagBeJsonRpcAddress, DefaultJSONRPCAddress, "the Block Explorer JSON-RPC server address to listen on")
-	cmd.Flags().String(FlagBeJsonRpcWsAddress, DefaultJSONRPCWsAddress, "the Block Explorer JSON-RPC WS server address to listen on")
 	cmd.Flags().Duration(FlagBeJsonRpcHttpTimeout, DefaultHTTPTimeout, "Sets a read/write timeout for block explorer json-rpc http server (0=infinite)")
 	cmd.Flags().Duration(FlagBeJsonRpcHttpIdleTimeout, DefaultHTTPIdleTimeout, "Sets a idle timeout for block explorer json-rpc http server (0=infinite)")
 	cmd.Flags().Duration(FlagBeJsonRpcMaxOpenConnection, DefaultMaxOpenConnections, "Maximum open connection for block explorer json-rpc http server")
+	cmd.Flags().Bool(FlagBeJsonRpcAllowCORS, DefaultAllowCORS, "Allow CORS requests")
 }
