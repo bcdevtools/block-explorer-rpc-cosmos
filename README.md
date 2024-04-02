@@ -4,10 +4,16 @@ Block Explorer RPC for Cosmos chains, as a module.
 ### Setup
 The following methods must be called:
 ```go
+config.EnsureRoot(home, config.DefaultBeJsonRpcConfig())
+// in root.go
+```
+```go
 config.AddBeJsonRpcFlags(rootCmd)
+// in start.go
 ```
 ```go
 server.StartBeJsonRPC(...)
+// in start.go
 ```
 
 ### Start
@@ -26,4 +32,5 @@ simd start \
     --be.http-idle-timeout 120s \
     --be.max-open-connections 0 \
     --be.allow-cors true
+# Configuration file is located at ~/$NODE_HOME/config/be-json-rpc.toml
 ```
