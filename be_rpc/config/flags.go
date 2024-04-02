@@ -17,7 +17,7 @@ const (
 
 const (
 	// DefaultEnable is the default value for enabling the BE-JSON-RPC server
-	DefaultEnable = true
+	DefaultEnable = false
 
 	// DefaultJSONRPCAddress is the default address the BE-JSON-RPC server binds to.
 	DefaultJSONRPCAddress = "0.0.0.0:11100"
