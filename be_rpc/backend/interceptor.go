@@ -12,10 +12,8 @@ type RequestInterceptor interface {
 	GetTransactionByHash(hashStr string) (intercepted bool, response berpctypes.GenericBackendResponse, err error)
 
 	GetDenomsInformation() (intercepted, append bool, denoms map[string]string, err error)
-	// TODO BE: module wasm
 
 	GetModuleParams(moduleName string) (intercepted bool, params berpctypes.GenericBackendResponse, err error)
-	// TODO BE: module wasm
 
 	GetAccount(accountAddressStr string) (intercepted, append bool, response berpctypes.GenericBackendResponse, err error)
 	// TODO BE: module wasm

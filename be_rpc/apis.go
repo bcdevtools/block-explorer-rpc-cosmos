@@ -119,8 +119,8 @@ func RegisterMessageParser(m sdk.Msg, parser berpctypes.MessageParser) {
 }
 
 // RegisterMessageInvolversExtractor registers a new involvers extractor for the given message type.
-// This overrides any existing parser for the given message type.
-// Contract: the parser must be registered before the server starts.
+// This overrides any existing extractor for the given message type.
+// Contract: the extractor must be registered before the server starts.
 // Legacy TODO BE: call to this function to register before startup
 func RegisterMessageInvolversExtractor(m sdk.Msg, extractor berpctypes.MessageInvolversExtractor) {
 	messageInvolversExtractors[berpcutils.ProtoMessageName(m)] = extractor
