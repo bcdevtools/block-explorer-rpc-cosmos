@@ -13,9 +13,10 @@ type MessageInvolversExtractor func(msg sdk.Msg, tx *tx.Tx, tmTx tmtypes.Tx, cli
 type InvolversType string
 
 const (
-	MessageInvolvers InvolversType = "0"
-	Erc20Involvers   InvolversType = "erc20"
-	NftInvolvers     InvolversType = "nft"
+	MessageSenderSigner InvolversType = "s"
+	MessageInvolvers    InvolversType = "0"
+	Erc20Involvers      InvolversType = "erc20"
+	NftInvolvers        InvolversType = "nft"
 )
 
 type MessageInvolversResult map[InvolversType][]string
