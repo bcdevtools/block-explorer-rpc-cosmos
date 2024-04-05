@@ -120,6 +120,17 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 
 				resInvolvers, err := messageInvolversExtractor(cosmosMsg, tx, tmTx, m.clientCtx)
 				if err == nil {
+					if _, found := resInvolvers[berpctypes.MessageSenderSigner]; !found {
+						// if no signer found, try to get it from the signers
+						func() {
+							defer func() {
+								_ = recover() // omit any error
+							}()
+							if len(cosmosMsg.GetSigners()) > 0 {
+								resInvolvers.Add(berpctypes.MessageSenderSigner, cosmosMsg.GetSigners()[0].String())
+							}
+						}()
+					}
 					involvers = resInvolvers.Finalize()
 				}
 			}
