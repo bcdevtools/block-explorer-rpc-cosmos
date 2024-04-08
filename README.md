@@ -26,7 +26,7 @@ simd start --be.enable true
 _(the following values are default values)_
 ```bash
 simd start \
-    --be.enable true \
+    --be.enable false \
     --be.address 0.0.0.0:11100 \
     --be.http-timeout 30s \
     --be.http-idle-timeout 120s \
