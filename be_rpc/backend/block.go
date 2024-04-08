@@ -11,6 +11,18 @@ import (
 	"strings"
 )
 
+func (m *Backend) GetLatestBlockNumber() (berpctypes.GenericBackendResponse, error) {
+	statusInfo, err := m.clientCtx.Client.Status(m.ctx)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	return berpctypes.GenericBackendResponse{
+		"latestBlock":             statusInfo.SyncInfo.LatestBlockHeight,
+		"latestBlockTimeEpochUTC": statusInfo.SyncInfo.LatestBlockTime.UTC().Unix(),
+	}, nil
+}
+
 func (m *Backend) GetBlockByNumber(height int64) (berpctypes.GenericBackendResponse, error) {
 	resBlock, err := m.queryClient.ServiceClient.GetBlockWithTxs(m.ctx, &tx.GetBlockWithTxsRequest{
 		Height: height,
