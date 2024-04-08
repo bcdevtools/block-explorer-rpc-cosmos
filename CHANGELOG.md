@@ -57,7 +57,15 @@ Templates for Unreleased:
 ## Unreleased
 
 #### Features
+
+#### Improvements
+
+## v1.0.3 - 2024-04-08
+
+#### Features
 - (rpc) [#2](https://github.com/bcdevtools/block-explorer-rpc-cosmos/pull/2) Add endpoint `be_getLatestBlockNumber`
+
+## v1.0.2 - 2024-04-05
 
 #### Improvements
 - (parser) [#1](https://github.com/bcdevtools/block-explorer-rpc-cosmos/pull/1) Add message signer into involvers list
