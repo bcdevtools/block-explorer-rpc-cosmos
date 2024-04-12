@@ -1,7 +1,11 @@
-# block-explorer-rpc-cosmos
-Block Explorer RPC for Cosmos chains, as a module.
+## Block Explorer RPC for Cosmos chains, as a module.
+
+Extensions:
+- [EVM](https://github.com/bcdevtools/evm-block-explorer-rpc-cosmos)
+- [Wasm](https://github.com/bcdevtools/wasm-block-explorer-rpc-cosmos)
 
 ### Setup
+
 The following methods must be called:
 ```go
 config.EnsureRoot(home, config.DefaultBeJsonRpcConfig())
@@ -17,12 +21,14 @@ server.StartBeJsonRPC(...)
 ```
 
 ### Start
+
 ```bash
 simd start --be.enable true
 # Port will be opened at 11100
 ```
 
 #### Optional configurations
+
 _(the following values are default values)_
 ```bash
 simd start \
