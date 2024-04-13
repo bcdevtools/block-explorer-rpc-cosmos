@@ -162,16 +162,15 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 					break
 				}
 
-				protoMsgName := berpcutils.ProtoMessageName(cosmosMsg)
-
-				switch protoMsgName {
-				case "/cosmwasm.wasm.v1.MsgInstantiateContract":
-					txType = txTypeWasm
-					wasmTxAction = constants.WasmActionCreate
-				case "/cosmwasm.wasm.v1.MsgExecuteContract":
-					txType = txTypeWasm
-					wasmTxAction = constants.WasmActionCall
-					if wasmTxSignature == "" {
+				if wasmTxAction == constants.WasmActionNone {
+					switch msg.TypeUrl {
+					case "/cosmwasm.wasm.v1.MsgInstantiateContract":
+						txType = txTypeWasm
+						wasmTxAction = constants.WasmActionCreate
+						wasmTxSignature = ""
+					case "/cosmwasm.wasm.v1.MsgExecuteContract":
+						txType = txTypeWasm
+						wasmTxAction = constants.WasmActionCall
 						msgContent, err := berpcutils.FromAnyToJsonMap(msg, m.clientCtx.Codec)
 						if err == nil {
 							if execMsgRaw, found := msgContent["msg"]; found {
@@ -192,7 +191,7 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 				}
 
 				var messageInvolversExtractor berpctypes.MessageInvolversExtractor
-				if extractor, found := m.messageInvolversExtractors[protoMsgName]; found {
+				if extractor, found := m.messageInvolversExtractors[berpcutils.ProtoMessageName(cosmosMsg)]; found {
 					messageInvolversExtractor = extractor
 				} else {
 					messageInvolversExtractor = m.defaultMessageInvolversExtractor
