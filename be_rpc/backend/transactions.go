@@ -3,7 +3,9 @@ package backend
 import (
 	"cosmossdk.io/errors"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/constants"
 	berpctypes "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/types"
 	berpcutils "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/utils"
 	"github.com/cosmos/cosmos-sdk/client"
@@ -76,12 +78,18 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 			continue
 		}
 
+		const txTypeCosmos = "cosmos"
+		const txTypeEvm = "evm"
+
 		var txsInfo []map[string]any
 		for txIdx := 0; txIdx < len(resBlock.Block.Data.Txs); txIdx++ {
 			tx := resBlock.Txs[txIdx]
 			tmTx := tmtypes.Tx(resBlock.Block.Data.Txs[txIdx])
 			txHash := strings.ToUpper(hex.EncodeToString(tmTx.Hash()))
-			txType := "cosmos"
+			txType := txTypeCosmos
+
+			evmTxAction := constants.EvmActionNone
+			var evmTxSignature string
 
 			var optionalTxResult *coretypes.ResultTx
 			if berpcutils.IsEvmTx(tx) {
@@ -93,7 +101,48 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 					// ignore
 				} else if evmTxHash := berpcutils.GetEvmTransactionHashFromEvent(optionalTxResult.TxResult.Events); evmTxHash != nil {
 					txHash = berpcutils.NormalizeTransactionHash(evmTxHash.String(), false)
-					txType = "evm"
+					txType = txTypeEvm
+
+					// if the tx is an EVM tx, we need to get method signature
+					txByHash, err := m.GetTransactionByHash(txHash)
+					if err == nil && txByHash != nil {
+						if evmTxRaw, found := txByHash["evmTx"]; found {
+							bz, err := json.Marshal(evmTxRaw)
+							if err == nil {
+								var evmTx map[string]any
+								err = json.Unmarshal(bz, &evmTx)
+								if err == nil {
+									var toStr, inputSigStr string
+									if toRaw, found := evmTx["to"]; found {
+										if to, ok := toRaw.(string); ok && len(to) > 0 {
+											toStr = to
+										}
+									}
+									if inputRaw, found := evmTx["input"]; found {
+										if input, ok := inputRaw.(string); ok {
+											if strings.HasPrefix(input, "0x") {
+												if len(input) >= 10 {
+													inputSigStr = input[:10]
+												}
+											} else {
+												if len(input) >= 8 {
+													inputSigStr = "0x" + input[:8]
+												}
+											}
+										}
+									}
+									if toStr == "" {
+										evmTxAction = constants.EvmActionCreate
+									} else if inputSigStr == "" {
+										evmTxAction = constants.EvmActionTransfer
+									} else {
+										evmTxAction = constants.EvmActionCall
+										evmTxSignature = inputSigStr
+									}
+								}
+							}
+						}
+					}
 				}
 			}
 
@@ -139,12 +188,23 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 
 			involvers.Finalize()
 
-			txsInfo = append(txsInfo, map[string]any{
+			txInfo := map[string]any{
 				"hash":         txHash,
 				"type":         txType,
 				"involvers":    involvers.ToResponseObject(),
 				"messagesType": messagesType,
-			})
+			}
+			if txType == txTypeEvm {
+				evmTxInfo := make(map[string]any)
+				txInfo["evmTx"] = evmTxInfo
+				if len(evmTxAction) > 0 {
+					evmTxInfo["action"] = evmTxAction
+				}
+				if len(evmTxSignature) > 0 {
+					evmTxInfo["sig"] = evmTxSignature
+				}
+			}
+			txsInfo = append(txsInfo, txInfo)
 		}
 
 		if errorBlocks.Has(height) {
