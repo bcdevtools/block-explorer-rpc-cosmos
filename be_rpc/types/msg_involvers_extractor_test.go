@@ -172,3 +172,29 @@ func Test_messageInvolversResult_Finalize(t *testing.T) {
 		one.(*messageInvolversResult).contractInvolvers,
 	)
 }
+
+func Test_messageInvolversResult_AddGenericInvolvers_AddContractInvolvers(t *testing.T) {
+	one := NewMessageInvolversResult()
+	one.AddGenericInvolvers(MessageInvolvers, "A1", "A2", "A4", "A2")
+	one.AddContractInvolvers(Erc20Involvers, "C1", "cA1", "cA2", "cA1")
+
+	require.Equal(
+		t,
+		MessageGenericInvolvers{
+			MessageInvolvers: {"a1", "a2", "a4", "a2"},
+		},
+		one.(*messageInvolversResult).genericInvolvers,
+		"all addresses must be added and lower-cased",
+	)
+
+	require.Equal(
+		t,
+		MessageContractsInvolvers{
+			Erc20Involvers: {
+				"c1": {"ca1", "ca2", "ca1"},
+			},
+		},
+		one.(*messageInvolversResult).contractInvolvers,
+		"all addresses must be added and lower-cased, include contract address",
+	)
+}
