@@ -56,11 +56,15 @@ Templates for Unreleased:
 
 ## Unreleased
 
+## v2.0.0 - 2024-04-14
+
 ### Features
 
 - (rpc) [#3](https://github.com/bcdevtools/block-explorer-rpc-cosmos/pull/3) `be_getAccount` response include account proto type
 
-### Improvements
+### API Breaking
+
+- (rpc) [#4](https://github.com/bcdevtools/block-explorer-rpc-cosmos/pull/4) Contract token balance involvers extractor
 
 ## v1.0.3 - 2024-04-08
 
