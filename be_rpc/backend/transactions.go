@@ -131,10 +131,13 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 							}
 						}()
 					}
-					resInvolvers.Finalize()
 					involvers = resInvolvers
+				} else {
+					m.GetLogger().Error("failed to extract involvers", "error", err)
 				}
 			}
+
+			involvers.Finalize()
 
 			txsInfo = append(txsInfo, map[string]any{
 				"hash":         txHash,

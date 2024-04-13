@@ -108,6 +108,10 @@ func (m *messageInvolversResult) AddContractInvolvers(t InvolversType, contractA
 
 // Finalize normalize addresses and removes duplicates from the result
 func (m *messageInvolversResult) Finalize() {
+	if m == nil {
+		return
+	}
+
 	r := newMessageInvolversResult()
 	r.genericInvolvers = func() MessageGenericInvolvers {
 		distinctMap := make(MessageGenericInvolvers)
