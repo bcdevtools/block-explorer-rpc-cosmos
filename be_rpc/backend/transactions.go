@@ -142,7 +142,7 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 			txsInfo = append(txsInfo, map[string]any{
 				"hash":         txHash,
 				"type":         txType,
-				"involvers":    involvers,
+				"involvers":    involvers.ToResponseObject(),
 				"messagesType": messagesType,
 			})
 		}

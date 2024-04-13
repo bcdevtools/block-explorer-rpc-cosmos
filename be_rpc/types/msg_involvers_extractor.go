@@ -17,6 +17,7 @@ const (
 	MessageInvolvers    InvolversType = "0"
 	Erc20Involvers      InvolversType = "erc20"
 	NftInvolvers        InvolversType = "nft"
+	ContractsInvolvers  InvolversType = "contracts"
 )
 
 type MessageInvolversResult interface {
@@ -24,6 +25,7 @@ type MessageInvolversResult interface {
 	AddGenericInvolvers(t InvolversType, addresses ...string)
 	AddContractInvolvers(t InvolversType, contractAddr ContractAddress, addresses ...string)
 	Finalize()
+	ToResponseObject() any
 
 	GenericInvolvers() MessageGenericInvolvers
 	ContractsInvolvers() MessageContractsInvolvers
@@ -148,6 +150,27 @@ func (m *messageInvolversResult) Finalize() {
 
 	m.genericInvolvers = r.genericInvolvers
 	m.contractInvolvers = r.contractInvolvers
+}
+
+func (m *messageInvolversResult) ToResponseObject() any {
+	if m == nil {
+		return nil
+	}
+
+	type responseObject map[string]any
+
+	res := make(responseObject)
+	for t, ivs := range m.genericInvolvers {
+		res[string(t)] = ivs
+	}
+	if len(m.contractInvolvers) > 0 {
+		contractInvolvers := make(responseObject)
+		for t, ivc := range m.contractInvolvers {
+			contractInvolvers[string(t)] = ivc
+		}
+		res["contracts"] = contractInvolvers
+	}
+	return res
 }
 
 func (m *messageInvolversResult) GenericInvolvers() MessageGenericInvolvers {
