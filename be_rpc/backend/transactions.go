@@ -120,18 +120,19 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 
 				resInvolvers, err := messageInvolversExtractor(cosmosMsg, tx, tmTx, m.clientCtx)
 				if err == nil {
-					if _, found := resInvolvers[berpctypes.MessageSenderSigner]; !found {
+					if _, found := resInvolvers.GenericInvolvers()[berpctypes.MessageSenderSigner]; !found {
 						// if no signer found, try to get it from the signers
 						func() {
 							defer func() {
 								_ = recover() // omit any error
 							}()
 							if len(cosmosMsg.GetSigners()) > 0 {
-								resInvolvers.Add(berpctypes.MessageSenderSigner, cosmosMsg.GetSigners()[0].String())
+								resInvolvers.AddGenericInvolvers(berpctypes.MessageSenderSigner, cosmosMsg.GetSigners()[0].String())
 							}
 						}()
 					}
-					involvers = resInvolvers.Finalize()
+					resInvolvers.Finalize()
+					involvers = resInvolvers
 				}
 			}
 
@@ -1195,143 +1196,143 @@ func (m *Backend) addIbcPacketInfoIntoResponse(packet channeltypes.Packet, res b
 }
 
 func (m *Backend) defaultMessageInvolversExtractor(msg sdk.Msg, tx *tx.Tx, tmTx tmtypes.Tx, clientCtx client.Context) (res berpctypes.MessageInvolversResult, err error) {
-	res = make(berpctypes.MessageInvolversResult)
+	res = berpctypes.NewMessageInvolversResult()
 
 	switch msg := msg.(type) {
 	case *banktypes.MsgSend:
-		res.Add(berpctypes.MessageInvolvers, msg.FromAddress, msg.ToAddress)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.FromAddress, msg.ToAddress)
 		return
 	case *banktypes.MsgMultiSend:
 		for _, input := range msg.Inputs {
-			res.Add(berpctypes.MessageInvolvers, input.Address)
+			res.AddGenericInvolvers(berpctypes.MessageInvolvers, input.Address)
 		}
 		for _, output := range msg.Outputs {
-			res.Add(berpctypes.MessageInvolvers, output.Address)
+			res.AddGenericInvolvers(berpctypes.MessageInvolvers, output.Address)
 		}
 		return
 	case *crisistypes.MsgVerifyInvariant:
-		res.Add(berpctypes.MessageInvolvers, msg.Sender)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.Sender)
 		return
 	case *disttypes.MsgSetWithdrawAddress:
-		res.Add(berpctypes.MessageInvolvers, msg.DelegatorAddress, msg.WithdrawAddress)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.DelegatorAddress, msg.WithdrawAddress)
 		return
 	case *disttypes.MsgWithdrawDelegatorReward:
-		res.Add(berpctypes.MessageInvolvers, msg.DelegatorAddress, msg.ValidatorAddress)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.DelegatorAddress, msg.ValidatorAddress)
 		return
 	case *disttypes.MsgWithdrawValidatorCommission:
-		res.Add(berpctypes.MessageInvolvers, msg.ValidatorAddress)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.ValidatorAddress)
 		return
 	case *disttypes.MsgFundCommunityPool:
-		res.Add(berpctypes.MessageInvolvers, msg.Depositor)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.Depositor)
 		return
 	case *evidencetypes.MsgSubmitEvidence:
-		res.Add(berpctypes.MessageInvolvers, msg.Submitter)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.Submitter)
 		return
 	case *govtypesv1.MsgSubmitProposal:
-		res.Add(berpctypes.MessageInvolvers, msg.Proposer)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.Proposer)
 		return
 	case *govtypeslegacy.MsgSubmitProposal:
-		res.Add(berpctypes.MessageInvolvers, msg.Proposer)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.Proposer)
 		return
 	case *govtypesv1.MsgDeposit:
-		res.Add(berpctypes.MessageInvolvers, msg.Depositor)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.Depositor)
 		return
 	case *govtypeslegacy.MsgDeposit:
-		res.Add(berpctypes.MessageInvolvers, msg.Depositor)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.Depositor)
 		return
 	case *govtypesv1.MsgVote:
-		res.Add(berpctypes.MessageInvolvers, msg.Voter)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.Voter)
 		return
 	case *govtypeslegacy.MsgVote:
-		res.Add(berpctypes.MessageInvolvers, msg.Voter)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.Voter)
 		return
 	case *govtypesv1.MsgVoteWeighted:
-		res.Add(berpctypes.MessageInvolvers, msg.Voter)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.Voter)
 		return
 	case *govtypeslegacy.MsgVoteWeighted:
-		res.Add(berpctypes.MessageInvolvers, msg.Voter)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.Voter)
 		return
 	case *ibctypes.MsgCreateClient:
-		res.Add(berpctypes.MessageInvolvers, msg.Signer)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.Signer)
 		return
 	case *ibctypes.MsgUpdateClient:
-		res.Add(berpctypes.MessageInvolvers, msg.Signer)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.Signer)
 		return
 	case *ibctypes.MsgUpgradeClient:
-		res.Add(berpctypes.MessageInvolvers, msg.Signer)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.Signer)
 		return
 	case *ibctypes.MsgSubmitMisbehaviour:
-		res.Add(berpctypes.MessageInvolvers, msg.Signer)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.Signer)
 		return
 	case *ibctransfertypes.MsgTransfer:
-		res.Add(berpctypes.MessageInvolvers, msg.Sender, msg.Receiver)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.Sender, msg.Receiver)
 		return
 	case *connectiontypes.MsgConnectionOpenAck:
-		res.Add(berpctypes.MessageInvolvers, msg.Signer)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.Signer)
 		return
 	case *connectiontypes.MsgConnectionOpenInit:
-		res.Add(berpctypes.MessageInvolvers, msg.Signer)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.Signer)
 		return
 	case *connectiontypes.MsgConnectionOpenConfirm:
-		res.Add(berpctypes.MessageInvolvers, msg.Signer)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.Signer)
 		return
 	case *connectiontypes.MsgConnectionOpenTry:
-		res.Add(berpctypes.MessageInvolvers, msg.Signer)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.Signer)
 		return
 	case *channeltypes.MsgChannelOpenInit:
-		res.Add(berpctypes.MessageInvolvers, msg.Signer)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.Signer)
 		return
 	case *channeltypes.MsgChannelOpenConfirm:
-		res.Add(berpctypes.MessageInvolvers, msg.Signer)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.Signer)
 		return
 	case *channeltypes.MsgChannelOpenTry:
-		res.Add(berpctypes.MessageInvolvers, msg.Signer)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.Signer)
 		return
 	case *channeltypes.MsgAcknowledgement:
-		res.Add(berpctypes.MessageInvolvers, msg.Signer)
-		res = res.Merge(m.getInvolversInIbcPacketInfo(msg.Packet))
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.Signer)
+		res.Merge(m.getInvolversInIbcPacketInfo(msg.Packet))
 		return
 	case *channeltypes.MsgChannelOpenAck:
-		res.Add(berpctypes.MessageInvolvers, msg.Signer)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.Signer)
 		return
 	case *channeltypes.MsgRecvPacket:
-		res.Add(berpctypes.MessageInvolvers, msg.Signer)
-		res = res.Merge(m.getInvolversInIbcPacketInfo(msg.Packet))
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.Signer)
+		res.Merge(m.getInvolversInIbcPacketInfo(msg.Packet))
 		return
 	case *channeltypes.MsgTimeout:
-		res.Add(berpctypes.MessageInvolvers, msg.Signer)
-		res = res.Merge(m.getInvolversInIbcPacketInfo(msg.Packet))
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.Signer)
+		res.Merge(m.getInvolversInIbcPacketInfo(msg.Packet))
 		return
 	case *channeltypes.MsgTimeoutOnClose:
-		res.Add(berpctypes.MessageInvolvers, msg.Signer)
-		res = res.Merge(m.getInvolversInIbcPacketInfo(msg.Packet))
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.Signer)
+		res.Merge(m.getInvolversInIbcPacketInfo(msg.Packet))
 		return
 	case *slashingtypes.MsgUnjail:
-		res.Add(berpctypes.MessageInvolvers, msg.ValidatorAddr)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.ValidatorAddr)
 		return
 	case *stakingtypes.MsgCreateValidator:
-		res.Add(berpctypes.MessageInvolvers, msg.DelegatorAddress, msg.ValidatorAddress)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.DelegatorAddress, msg.ValidatorAddress)
 		return
 	case *stakingtypes.MsgEditValidator:
-		res.Add(berpctypes.MessageInvolvers, msg.ValidatorAddress)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.ValidatorAddress)
 		return
 	case *stakingtypes.MsgDelegate:
-		res.Add(berpctypes.MessageInvolvers, msg.DelegatorAddress, msg.ValidatorAddress)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.DelegatorAddress, msg.ValidatorAddress)
 		return
 	case *stakingtypes.MsgBeginRedelegate:
-		res.Add(berpctypes.MessageInvolvers, msg.DelegatorAddress, msg.ValidatorSrcAddress, msg.ValidatorDstAddress)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.DelegatorAddress, msg.ValidatorSrcAddress, msg.ValidatorDstAddress)
 		return
 	case *stakingtypes.MsgUndelegate:
-		res.Add(berpctypes.MessageInvolvers, msg.DelegatorAddress, msg.ValidatorAddress)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.DelegatorAddress, msg.ValidatorAddress)
 		return
 	case *stakingtypes.MsgCancelUnbondingDelegation:
-		res.Add(berpctypes.MessageInvolvers, msg.DelegatorAddress, msg.ValidatorAddress)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.DelegatorAddress, msg.ValidatorAddress)
 		return
 	case *authztypes.MsgGrant:
-		res.Add(berpctypes.MessageInvolvers, msg.Granter, msg.Grantee)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.Granter, msg.Grantee)
 		return
 	case *authztypes.MsgExec:
-		res.Add(berpctypes.MessageInvolvers, msg.Grantee)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.Grantee)
 
 		if len(msg.Msgs) > 0 {
 			for _, authorizedMsgAny := range msg.Msgs {
@@ -1345,12 +1346,12 @@ func (m *Backend) defaultMessageInvolversExtractor(msg sdk.Msg, tx *tx.Tx, tmTx 
 					continue
 				}
 
-				res = res.Merge(resChild)
+				res.Merge(resChild)
 			}
 		}
 		return
 	case *authztypes.MsgRevoke:
-		res.Add(berpctypes.MessageInvolvers, msg.Granter, msg.Grantee)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.Granter, msg.Grantee)
 		return
 	default:
 		m.GetLogger().Error("missing message involvers extractor", "msg-type", berpcutils.ProtoMessageName(msg))
@@ -1369,7 +1370,7 @@ func (m *Backend) defaultMessageInvolversExtractor(msg sdk.Msg, tx *tx.Tx, tmTx 
 		for _, event := range resTxResult.TxResult.Events {
 			for _, attribute := range event.Attributes {
 				if m.bech32Cfg.IsAccountAddr(string(attribute.Value)) {
-					res.Add(berpctypes.MessageInvolvers, string(attribute.Value))
+					res.AddGenericInvolvers(berpctypes.MessageInvolvers, string(attribute.Value))
 				}
 			}
 		}
@@ -1378,11 +1379,11 @@ func (m *Backend) defaultMessageInvolversExtractor(msg sdk.Msg, tx *tx.Tx, tmTx 
 }
 
 func (m *Backend) getInvolversInIbcPacketInfo(packet channeltypes.Packet) (res berpctypes.MessageInvolversResult) {
-	res = make(berpctypes.MessageInvolversResult)
+	res = berpctypes.NewMessageInvolversResult()
 
 	var data ibctransfertypes.FungibleTokenPacketData
 	if err := ibctransfertypes.ModuleCdc.UnmarshalJSON(packet.Data, &data); err == nil {
-		res.Add(berpctypes.MessageInvolvers, data.Sender, data.Receiver)
+		res.AddGenericInvolvers(berpctypes.MessageInvolvers, data.Sender, data.Receiver)
 	}
 
 	return res

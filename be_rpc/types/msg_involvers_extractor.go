@@ -19,16 +19,56 @@ const (
 	NftInvolvers        InvolversType = "nft"
 )
 
-type MessageInvolversResult map[InvolversType][]string
+type MessageInvolversResult interface {
+	Merge(other MessageInvolversResult)
+	AddGenericInvolvers(t InvolversType, addresses ...string)
+	AddContractInvolvers(t InvolversType, contractAddr ContractAddress, addresses ...string)
+	Finalize()
 
-func (m MessageInvolversResult) Merge(other MessageInvolversResult) MessageInvolversResult {
-	for k, v := range other {
-		m[k] = append(m[k], v...)
-	}
-	return m
+	GenericInvolvers() MessageGenericInvolvers
+	ContractsInvolvers() MessageContractsInvolvers
 }
 
-func (m MessageInvolversResult) Add(t InvolversType, addresses ...string) {
+type MessageGenericInvolvers map[InvolversType][]string
+
+type MessageContractsInvolvers map[InvolversType]MessageContractsInvolversByType
+
+type ContractAddress string
+type MessageContractsInvolversByType map[ContractAddress][]string
+
+var _ MessageInvolversResult = &messageInvolversResult{}
+
+type messageInvolversResult struct {
+	genericInvolvers  MessageGenericInvolvers
+	contractInvolvers MessageContractsInvolvers
+}
+
+func NewMessageInvolversResult() MessageInvolversResult {
+	return newMessageInvolversResult()
+}
+
+func newMessageInvolversResult() *messageInvolversResult {
+	return &messageInvolversResult{
+		genericInvolvers:  make(MessageGenericInvolvers),
+		contractInvolvers: make(MessageContractsInvolvers),
+	}
+}
+
+func (m *messageInvolversResult) Merge(other MessageInvolversResult) {
+	for ivt, ivs := range other.GenericInvolvers() {
+		m.genericInvolvers[ivt] = append(m.genericInvolvers[ivt], ivs...)
+	}
+	for ivt, ivc := range other.ContractsInvolvers() {
+		if _, exists := m.contractInvolvers[ivt]; !exists {
+			m.contractInvolvers[ivt] = make(MessageContractsInvolversByType)
+		}
+		for contract, ivs := range ivc {
+			m.contractInvolvers[ivt][contract] = append(m.contractInvolvers[ivt][contract], ivs...)
+		}
+	}
+}
+
+func (m *messageInvolversResult) AddGenericInvolvers(t InvolversType, addresses ...string) {
 	for _, address := range addresses {
 		address := normalizeAddress(address)
 		if len(address) == 0 {
@@ -38,24 +78,80 @@ func (m MessageInvolversResult) Add(t InvolversType, addresses ...string) {
 		spl := strings.Split(address, "/") // remove the suffix
 		address = spl[0]
 
-		m[t] = append(m[t], address)
+		m.genericInvolvers[t] = append(m.genericInvolvers[t], address)
+	}
+}
+
+func (m *messageInvolversResult) AddContractInvolvers(t InvolversType, contractAddr ContractAddress, addresses ...string) {
+	contractAddr = ContractAddress(normalizeAddress(string(contractAddr)))
+
+	var involvedInContract MessageContractsInvolversByType
+	if ci, exists := m.contractInvolvers[t]; exists {
+		involvedInContract = ci
+	} else {
+		involvedInContract = make(MessageContractsInvolversByType)
+		m.contractInvolvers[t] = involvedInContract
+	}
+
+	for _, address := range addresses {
+		address := normalizeAddress(address)
+		if len(address) == 0 {
+			continue
+		}
+
+		spl := strings.Split(address, "/") // remove the suffix
+		address = spl[0]
+
+		involvedInContract[contractAddr] = append(involvedInContract[contractAddr], address)
 	}
 }
 
 // Finalize normalize addresses and removes duplicates from the result
-func (m MessageInvolversResult) Finalize() MessageInvolversResult {
-	r := make(MessageInvolversResult)
-	for k, v := range m {
-		unique := make(map[string]bool)
-		for _, addr := range v {
-			unique[normalizeAddress(addr)] = true
+func (m *messageInvolversResult) Finalize() {
+	r := newMessageInvolversResult()
+	r.genericInvolvers = func() MessageGenericInvolvers {
+		distinctMap := make(MessageGenericInvolvers)
+		for ivt, ivs := range m.genericInvolvers {
+			unique := make(map[string]bool)
+			for _, addr := range ivs {
+				unique[normalizeAddress(addr)] = true
+			}
+			distinctMap[ivt] = make([]string, 0, len(unique))
+			for addr := range unique {
+				distinctMap[ivt] = append(distinctMap[ivt], addr)
+			}
 		}
-		r[k] = make([]string, 0, len(unique))
-		for addr := range unique {
-			r[k] = append(r[k], addr)
+		return distinctMap
+	}()
+	r.contractInvolvers = func() MessageContractsInvolvers {
+		res := make(MessageContractsInvolvers)
+		for ivt, ivc := range m.contractInvolvers {
+			distinctMap := make(MessageContractsInvolversByType)
+			for contract, ivs := range ivc {
+				unique := make(map[string]bool)
+				for _, addr := range ivs {
+					unique[normalizeAddress(addr)] = true
+				}
+				distinctMap[contract] = make([]string, 0, len(unique))
+				for addr := range unique {
+					distinctMap[contract] = append(distinctMap[contract], addr)
+				}
+			}
+			res[ivt] = distinctMap
 		}
-	}
-	return r
+		return res
+	}()
+
+	m.genericInvolvers = r.genericInvolvers
+	m.contractInvolvers = r.contractInvolvers
+}
+
+func (m *messageInvolversResult) GenericInvolvers() MessageGenericInvolvers {
+	return m.genericInvolvers
+}
+
+func (m *messageInvolversResult) ContractsInvolvers() MessageContractsInvolvers {
+	return m.contractInvolvers
 }
 
 func normalizeAddress(address string) string {
