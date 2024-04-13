@@ -168,7 +168,7 @@ func (m *messageInvolversResult) ToResponseObject() any {
 		for t, ivc := range m.contractInvolvers {
 			contractInvolvers[string(t)] = ivc
 		}
-		res["contracts"] = contractInvolvers
+		res[string(ContractsInvolvers)] = contractInvolvers
 	}
 	return res
 }
