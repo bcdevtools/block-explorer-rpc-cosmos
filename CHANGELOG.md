@@ -58,9 +58,10 @@ Templates for Unreleased:
 
 ## v2.0.0 - 2024-04-14
 
-### Features
+### Improvements
 
 - (rpc) [#3](https://github.com/bcdevtools/block-explorer-rpc-cosmos/pull/3) `be_getAccount` response include account proto type
+- (rpc) [#5](https://github.com/bcdevtools/block-explorer-rpc-cosmos/pull/5) `be_getTransactionsInBlockRange` response include some evm tx information
 
 ### API Breaking
 
