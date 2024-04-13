@@ -24,8 +24,6 @@ import (
 	ibctypes "github.com/cosmos/ibc-go/v6/modules/core/02-client/types"
 	connectiontypes "github.com/cosmos/ibc-go/v6/modules/core/03-connection/types"
 	channeltypes "github.com/cosmos/ibc-go/v6/modules/core/04-channel/types"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	tmtypes "github.com/tendermint/tendermint/types"
 	"google.golang.org/grpc/codes"
@@ -143,24 +141,6 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 									}
 								}
 							}
-							if evmTx, ok := evmTxRaw.(map[string]any); ok {
-								if toRaw, found := evmTx["to"]; found {
-									if to, ok := toRaw.(*common.Address); ok && to == nil {
-										evmTxSignature = "deploy"
-									}
-								} else {
-									evmTxSignature = "deploy"
-								}
-								if evmTxSignature == "" {
-									if inputRaw, found := evmTx["input"]; found {
-										if input, ok := inputRaw.(hexutil.Bytes); ok {
-											if len(input) >= 4 {
-												evmTxSignature = "0x" + hex.EncodeToString(input[:4])
-											}
-										}
-									}
-								}
-							}
 						}
 					}
 				}
@@ -214,11 +194,15 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 				"involvers":    involvers.ToResponseObject(),
 				"messagesType": messagesType,
 			}
-			if len(evmTxAction) > 0 {
-				txInfo["evmTxAction"] = evmTxAction
-			}
-			if len(evmTxSignature) > 0 {
-				txInfo["evmTxSig"] = evmTxSignature
+			if txType == txTypeEvm {
+				evmTxInfo := make(map[string]any)
+				txInfo["evmTx"] = evmTxInfo
+				if len(evmTxAction) > 0 {
+					evmTxInfo["action"] = evmTxAction
+				}
+				if len(evmTxSignature) > 0 {
+					evmTxInfo["sig"] = evmTxSignature
+				}
 			}
 			txsInfo = append(txsInfo, txInfo)
 		}
