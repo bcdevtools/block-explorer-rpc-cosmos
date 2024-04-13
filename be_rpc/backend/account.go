@@ -101,6 +101,7 @@ func (m *Backend) GetAccount(accountAddressStr string) (berpctypes.GenericBacken
 		})
 
 		if err == nil && resAccount != nil && resAccount.Account != nil {
+			res["typeUrl"] = resAccount.Account.TypeUrl
 			fakeBaseAccount := &berpctypes.FakeBaseAccount{}
 			extractedSuccess, err := fakeBaseAccount.TryUnmarshalFromProto(resAccount.Account, m.clientCtx.Codec)
 			if err == nil && extractedSuccess {

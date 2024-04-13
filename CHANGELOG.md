@@ -41,31 +41,33 @@ Templates for Unreleased:
 
 ## Unreleased
 
-#### Features
+### Features
 
-#### Improvements
+### Improvements
 
-#### Bug Fixes
+### Bug Fixes
 
-#### Schema Breaking
+### Schema Breaking
 
-#### API Breaking
+### API Breaking
 -->
 
 # Changelog
 
 ## Unreleased
 
-#### Features
+### Features
 
-#### Improvements
+- (rpc) [#3](https://github.com/bcdevtools/block-explorer-rpc-cosmos/pull/3) `be_getAccount` response include account proto type
+
+### Improvements
 
 ## v1.0.3 - 2024-04-08
 
-#### Features
+### Features
 - (rpc) [#2](https://github.com/bcdevtools/block-explorer-rpc-cosmos/pull/2) Add endpoint `be_getLatestBlockNumber`
 
 ## v1.0.2 - 2024-04-05
 
-#### Improvements
+### Improvements
 - (parser) [#1](https://github.com/bcdevtools/block-explorer-rpc-cosmos/pull/1) Add message signer into involvers list
