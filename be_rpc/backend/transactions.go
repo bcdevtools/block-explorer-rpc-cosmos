@@ -24,7 +24,6 @@ import (
 	ibctypes "github.com/cosmos/ibc-go/v6/modules/core/02-client/types"
 	connectiontypes "github.com/cosmos/ibc-go/v6/modules/core/03-connection/types"
 	channeltypes "github.com/cosmos/ibc-go/v6/modules/core/04-channel/types"
-	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	tmtypes "github.com/tendermint/tendermint/types"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -80,6 +79,7 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 
 		const txTypeCosmos = "cosmos"
 		const txTypeEvm = "evm"
+		const txTypeWasm = "wasm"
 
 		var txsInfo []map[string]any
 		for txIdx := 0; txIdx < len(resBlock.Block.Data.Txs); txIdx++ {
@@ -91,12 +91,14 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 			evmTxAction := constants.EvmActionNone
 			var evmTxSignature string
 
-			var optionalTxResult *coretypes.ResultTx
+			wasmTxAction := constants.WasmActionNone
+			var wasmTxSignature string
+
 			if berpcutils.IsEvmTx(tx) {
-				var errTxResult error
-				optionalTxResult, errTxResult = m.clientCtx.Client.Tx(m.ctx, tmTx.Hash(), false)
+				optionalTxResult, errTxResult := m.clientCtx.Client.Tx(m.ctx, tmTx.Hash(), false)
 				if errTxResult != nil {
 					m.GetLogger().Error("failed to query tx", "error", errTxResult)
+					// TODO BE: find another way to handle properly when error
 				} else if optionalTxResult == nil {
 					// ignore
 				} else if evmTxHash := berpcutils.GetEvmTransactionHashFromEvent(optionalTxResult.TxResult.Events); evmTxHash != nil {
@@ -160,8 +162,37 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 					break
 				}
 
+				protoMsgName := berpcutils.ProtoMessageName(cosmosMsg)
+
+				switch protoMsgName {
+				case "/cosmwasm.wasm.v1.MsgInstantiateContract":
+					txType = txTypeWasm
+					wasmTxAction = constants.WasmActionCreate
+				case "/cosmwasm.wasm.v1.MsgExecuteContract":
+					txType = txTypeWasm
+					wasmTxAction = constants.WasmActionCall
+					if wasmTxSignature == "" {
+						msgContent, err := berpcutils.FromAnyToJsonMap(msg, m.clientCtx.Codec)
+						if err == nil {
+							if execMsgRaw, found := msgContent["msg"]; found {
+								bz, err := json.Marshal(execMsgRaw)
+								if err == nil {
+									var execMsg map[string]any
+									err = json.Unmarshal(bz, &execMsg)
+									if err == nil && len(execMsg) > 0 {
+										for k := range execMsg {
+											wasmTxSignature = k
+											break
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+
 				var messageInvolversExtractor berpctypes.MessageInvolversExtractor
-				if extractor, found := m.messageInvolversExtractors[berpcutils.ProtoMessageName(cosmosMsg)]; found {
+				if extractor, found := m.messageInvolversExtractors[protoMsgName]; found {
 					messageInvolversExtractor = extractor
 				} else {
 					messageInvolversExtractor = m.defaultMessageInvolversExtractor
@@ -202,6 +233,15 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 				}
 				if len(evmTxSignature) > 0 {
 					evmTxInfo["sig"] = evmTxSignature
+				}
+			} else if txType == txTypeWasm {
+				wasmTxInfo := make(map[string]any)
+				txInfo["wasmTx"] = wasmTxInfo
+				if len(wasmTxAction) > 0 {
+					wasmTxInfo["action"] = wasmTxAction
+				}
+				if len(wasmTxSignature) > 0 {
+					wasmTxInfo["sig"] = wasmTxSignature
 				}
 			}
 			txsInfo = append(txsInfo, txInfo)
