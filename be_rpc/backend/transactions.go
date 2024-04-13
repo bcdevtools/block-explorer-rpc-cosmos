@@ -3,7 +3,9 @@ package backend
 import (
 	"cosmossdk.io/errors"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/constants"
 	berpctypes "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/types"
 	berpcutils "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/utils"
 	"github.com/cosmos/cosmos-sdk/client"
@@ -88,6 +90,7 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 			txHash := strings.ToUpper(hex.EncodeToString(tmTx.Hash()))
 			txType := txTypeCosmos
 
+			evmTxAction := constants.EvmActionNone
 			var evmTxSignature string
 
 			var optionalTxResult *coretypes.ResultTx
@@ -106,6 +109,40 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 					txByHash, err := m.GetTransactionByHash(txHash)
 					if err == nil && txByHash != nil {
 						if evmTxRaw, found := txByHash["evmTx"]; found {
+							bz, err := json.Marshal(evmTxRaw)
+							if err == nil {
+								var evmTx map[string]any
+								err = json.Unmarshal(bz, &evmTx)
+								if err == nil {
+									var toStr, inputSigStr string
+									if toRaw, found := evmTx["to"]; found {
+										if to, ok := toRaw.(string); ok && len(to) > 0 {
+											toStr = to
+										}
+									}
+									if inputRaw, found := evmTx["input"]; found {
+										if input, ok := inputRaw.(string); ok {
+											if strings.HasPrefix(input, "0x") {
+												if len(input) >= 10 {
+													inputSigStr = input[:10]
+												}
+											} else {
+												if len(input) >= 8 {
+													inputSigStr = "0x" + input[:8]
+												}
+											}
+										}
+									}
+									if toStr == "" {
+										evmTxAction = constants.EvmActionCreate
+									} else if inputSigStr == "" {
+										evmTxAction = constants.EvmActionTransfer
+									} else {
+										evmTxAction = constants.EvmActionCall
+										evmTxSignature = inputSigStr
+									}
+								}
+							}
 							if evmTx, ok := evmTxRaw.(map[string]any); ok {
 								if toRaw, found := evmTx["to"]; found {
 									if to, ok := toRaw.(*common.Address); ok && to == nil {
@@ -176,6 +213,9 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 				"type":         txType,
 				"involvers":    involvers.ToResponseObject(),
 				"messagesType": messagesType,
+			}
+			if len(evmTxAction) > 0 {
+				txInfo["evmTxAction"] = evmTxAction
 			}
 			if len(evmTxSignature) > 0 {
 				txInfo["evmTxSig"] = evmTxSignature
