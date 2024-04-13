@@ -173,6 +173,4 @@ func addCorsHeaders(httpMethod string, responseWriter http.ResponseWriter) {
 		responseWriter.Header().Set("Access-Control-Allow-Methods", "POST")
 		responseWriter.Header().Set("Access-Control-Allow-Headers", "DNT,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Origin,Accept,X-Server-Time")
 	}
-
-	return
 }

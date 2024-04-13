@@ -77,7 +77,6 @@ func (m *Backend) GetModuleParams(moduleName string) (berpctypes.GenericBackendR
 		} else {
 			params = bankParams.Params
 		}
-		break
 	case "staking":
 		stakingParams, errFetch := m.queryClient.StakingQueryClient.Params(m.ctx, &stakingtypes.QueryParamsRequest{})
 		if errFetch != nil {
@@ -85,7 +84,6 @@ func (m *Backend) GetModuleParams(moduleName string) (berpctypes.GenericBackendR
 		} else {
 			params = stakingParams.Params
 		}
-		break
 	case "distribution":
 		distributionParams, errFetch := m.queryClient.DistributionQueryClient.Params(m.ctx, &disttypes.QueryParamsRequest{})
 		if errFetch != nil {
@@ -93,7 +91,6 @@ func (m *Backend) GetModuleParams(moduleName string) (berpctypes.GenericBackendR
 		} else {
 			params = distributionParams.Params
 		}
-		break
 	case "gov":
 		govParams, errFetch := m.queryClient.GovV1QueryClient.Params(m.ctx, &govv1types.QueryParamsRequest{})
 		if errFetch != nil {
@@ -101,7 +98,6 @@ func (m *Backend) GetModuleParams(moduleName string) (berpctypes.GenericBackendR
 		} else {
 			params = govParams
 		}
-		break
 	case "mint":
 		mintParams, errFetch := m.queryClient.MintQueryClient.Params(m.ctx, &minttypes.QueryParamsRequest{})
 		if errFetch != nil {
@@ -109,10 +105,8 @@ func (m *Backend) GetModuleParams(moduleName string) (berpctypes.GenericBackendR
 		} else {
 			params = mintParams.Params
 		}
-		break
 	default:
 		err = errors.Errorf("not yet support module %s", moduleName)
-		break
 	}
 
 	if err != nil {

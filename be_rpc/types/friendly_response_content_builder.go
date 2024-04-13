@@ -85,7 +85,6 @@ func (f *friendlyResponseContentBuilder) BuildIntoResponse(res GenericBackendRes
 	friendlySimple, friendlyMachine := f.Build()
 	res["cts"] = friendlySimple
 	res["ctm"] = friendlyMachine
-	return
 }
 
 func (f *friendlyResponseContentBuilder) addMachinePattern(_type, content string) {

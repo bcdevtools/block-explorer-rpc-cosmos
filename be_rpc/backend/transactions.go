@@ -486,20 +486,15 @@ func (m *Backend) defaultMessageParser(msg sdk.Msg, msgIdx uint, tx *tx.Tx, txRe
 		switch msg.Option {
 		case govtypesv1.OptionYes:
 			rb.WriteText(" votes YES")
-			break
 		case govtypesv1.OptionNo:
 			rb.WriteText(" votes NO")
-			break
 		case govtypesv1.OptionAbstain:
 			rb.WriteText(" votes Abstains")
-			break
 		case govtypesv1.OptionNoWithVeto:
 			rb.WriteText(" votes NO with VETO")
-			break
 		default:
 			rb.WriteText(" votes ").
 				WriteText(msg.Option.String())
-			break
 		}
 
 		rb.WriteText(" to proposal ").
@@ -520,20 +515,15 @@ func (m *Backend) defaultMessageParser(msg sdk.Msg, msgIdx uint, tx *tx.Tx, txRe
 		switch msg.Option {
 		case govtypeslegacy.OptionYes:
 			rb.WriteText(" votes YES")
-			break
 		case govtypeslegacy.OptionNo:
 			rb.WriteText(" votes NO")
-			break
 		case govtypeslegacy.OptionAbstain:
 			rb.WriteText(" votes Abstains")
-			break
 		case govtypeslegacy.OptionNoWithVeto:
 			rb.WriteText(" votes NO with VETO")
-			break
 		default:
 			rb.WriteText(" votes ").
 				WriteText(msg.Option.String())
-			break
 		}
 
 		rb.WriteText(" to proposal ").
