@@ -22,6 +22,8 @@ import (
 	ibctypes "github.com/cosmos/ibc-go/v6/modules/core/02-client/types"
 	connectiontypes "github.com/cosmos/ibc-go/v6/modules/core/03-connection/types"
 	channeltypes "github.com/cosmos/ibc-go/v6/modules/core/04-channel/types"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	tmtypes "github.com/tendermint/tendermint/types"
 	"google.golang.org/grpc/codes"
@@ -76,12 +78,17 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 			continue
 		}
 
+		const txTypeCosmos = "cosmos"
+		const txTypeEvm = "evm"
+
 		var txsInfo []map[string]any
 		for txIdx := 0; txIdx < len(resBlock.Block.Data.Txs); txIdx++ {
 			tx := resBlock.Txs[txIdx]
 			tmTx := tmtypes.Tx(resBlock.Block.Data.Txs[txIdx])
 			txHash := strings.ToUpper(hex.EncodeToString(tmTx.Hash()))
-			txType := "cosmos"
+			txType := txTypeCosmos
+
+			var evmTxSignature string
 
 			var optionalTxResult *coretypes.ResultTx
 			if berpcutils.IsEvmTx(tx) {
@@ -93,7 +100,32 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 					// ignore
 				} else if evmTxHash := berpcutils.GetEvmTransactionHashFromEvent(optionalTxResult.TxResult.Events); evmTxHash != nil {
 					txHash = berpcutils.NormalizeTransactionHash(evmTxHash.String(), false)
-					txType = "evm"
+					txType = txTypeEvm
+
+					// if the tx is an EVM tx, we need to get method signature
+					txByHash, err := m.GetTransactionByHash(txHash)
+					if err == nil && txByHash != nil {
+						if evmTxRaw, found := txByHash["evmTx"]; found {
+							if evmTx, ok := evmTxRaw.(map[string]any); ok {
+								if toRaw, found := evmTx["to"]; found {
+									if to, ok := toRaw.(*common.Address); ok && to == nil {
+										evmTxSignature = "deploy"
+									}
+								} else {
+									evmTxSignature = "deploy"
+								}
+								if evmTxSignature == "" {
+									if inputRaw, found := evmTx["input"]; found {
+										if input, ok := inputRaw.(hexutil.Bytes); ok {
+											if len(input) >= 4 {
+												evmTxSignature = "0x" + hex.EncodeToString(input[:4])
+											}
+										}
+									}
+								}
+							}
+						}
+					}
 				}
 			}
 
@@ -139,12 +171,16 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 
 			involvers.Finalize()
 
-			txsInfo = append(txsInfo, map[string]any{
+			txInfo := map[string]any{
 				"hash":         txHash,
 				"type":         txType,
 				"involvers":    involvers.ToResponseObject(),
 				"messagesType": messagesType,
-			})
+			}
+			if len(evmTxSignature) > 0 {
+				txInfo["evmTxSig"] = evmTxSignature
+			}
+			txsInfo = append(txsInfo, txInfo)
 		}
 
 		if errorBlocks.Has(height) {
