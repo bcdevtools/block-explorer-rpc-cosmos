@@ -56,6 +56,10 @@ Templates for Unreleased:
 
 ## Unreleased
 
+### Improvements
+
+- (rpc) [#6](https://github.com/bcdevtools/block-explorer-rpc-cosmos/pull/6) `be_getTransactionsInBlockRange` response include some wasm tx information
+
 ## v1.1.0 - 2024-04-14
 
 ### Improvements
