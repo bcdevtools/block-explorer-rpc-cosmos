@@ -3,7 +3,6 @@ package backend
 import (
 	"cosmossdk.io/errors"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/constants"
 	berpctypes "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/types"
@@ -108,40 +107,29 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 					// if the tx is an EVM tx, we need to get method signature
 					txByHash, err := m.GetTransactionByHash(txHash)
 					if err == nil && txByHash != nil {
-						if evmTxRaw, found := txByHash["evmTx"]; found {
-							bz, err := json.Marshal(evmTxRaw)
-							if err == nil {
-								var evmTx map[string]any
-								err = json.Unmarshal(bz, &evmTx)
-								if err == nil {
-									var toStr, inputSigStr string
-									if toRaw, found := evmTx["to"]; found {
-										if to, ok := toRaw.(string); ok && len(to) > 0 {
-											toStr = to
-										}
+						if evmTx, err := berpcutils.TryConvertAnyStructToMap(txByHash["evmTx"]); err == nil && len(evmTx) > 0 {
+							var toStr, inputSigStr string
+							if to, ok := berpcutils.TryGetMapValueAsType[string](evmTx, "to"); ok && len(to) > 0 {
+								toStr = to
+							}
+							if input, ok := berpcutils.TryGetMapValueAsType[string](evmTx, "input"); ok && len(input) > 0 {
+								if strings.HasPrefix(input, "0x") {
+									if len(input) >= 10 {
+										inputSigStr = input[:10]
 									}
-									if inputRaw, found := evmTx["input"]; found {
-										if input, ok := inputRaw.(string); ok {
-											if strings.HasPrefix(input, "0x") {
-												if len(input) >= 10 {
-													inputSigStr = input[:10]
-												}
-											} else {
-												if len(input) >= 8 {
-													inputSigStr = "0x" + input[:8]
-												}
-											}
-										}
-									}
-									if toStr == "" {
-										evmTxAction = constants.EvmActionCreate
-									} else if inputSigStr == "" {
-										evmTxAction = constants.EvmActionTransfer
-									} else {
-										evmTxAction = constants.EvmActionCall
-										evmTxSignature = inputSigStr
+								} else {
+									if len(input) >= 8 {
+										inputSigStr = "0x" + input[:8]
 									}
 								}
+							}
+							if toStr == "" {
+								evmTxAction = constants.EvmActionCreate
+							} else if inputSigStr == "" {
+								evmTxAction = constants.EvmActionTransfer
+							} else {
+								evmTxAction = constants.EvmActionCall
+								evmTxSignature = inputSigStr
 							}
 						}
 					}
@@ -171,19 +159,11 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 					case "/cosmwasm.wasm.v1.MsgExecuteContract":
 						txType = txTypeWasm
 						wasmTxAction = constants.WasmActionCall
-						msgContent, err := berpcutils.FromAnyToJsonMap(msg, m.clientCtx.Codec)
-						if err == nil {
-							if execMsgRaw, found := msgContent["msg"]; found {
-								bz, err := json.Marshal(execMsgRaw)
-								if err == nil {
-									var execMsg map[string]any
-									err = json.Unmarshal(bz, &execMsg)
-									if err == nil && len(execMsg) > 0 {
-										for k := range execMsg {
-											wasmTxSignature = k
-											break
-										}
-									}
+						if msgContent, err := berpcutils.FromAnyToJsonMap(msg, m.clientCtx.Codec); err == nil {
+							if execMsg, err := berpcutils.TryConvertAnyStructToMap(msgContent["msg"]); err == nil && len(execMsg) > 0 {
+								for k := range execMsg {
+									wasmTxSignature = k
+									break
 								}
 							}
 						}
