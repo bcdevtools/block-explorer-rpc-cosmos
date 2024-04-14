@@ -211,7 +211,7 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 					evmTxInfo["action"] = evmTxAction
 				}
 				if len(evmTxSignature) > 0 {
-					evmTxInfo["sig"] = evmTxSignature
+					evmTxInfo["sig"] = strings.TrimSpace(strings.ToLower(evmTxSignature))
 				}
 			} else if txType == txTypeWasm {
 				wasmTxInfo := make(map[string]any)
@@ -220,7 +220,7 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 					wasmTxInfo["action"] = wasmTxAction
 				}
 				if len(wasmTxSignature) > 0 {
-					wasmTxInfo["sig"] = wasmTxSignature
+					wasmTxInfo["sig"] = strings.TrimSpace(strings.ToLower(wasmTxSignature))
 				}
 			}
 			txsInfo = append(txsInfo, txInfo)
