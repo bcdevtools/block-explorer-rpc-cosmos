@@ -56,6 +56,10 @@ Templates for Unreleased:
 
 ## Unreleased
 
+### Improvements
+
+- (rpc) [#7](https://github.com/bcdevtools/block-explorer-rpc-cosmos/pull/7) Improve IBC messages translation & add IBC packet info into message parser
+
 ## v1.1.1 - 2024-04-14
 
 ### Improvements
