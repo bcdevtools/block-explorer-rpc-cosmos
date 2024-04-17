@@ -23,6 +23,7 @@ import (
 	ibctypes "github.com/cosmos/ibc-go/v6/modules/core/02-client/types"
 	connectiontypes "github.com/cosmos/ibc-go/v6/modules/core/03-connection/types"
 	channeltypes "github.com/cosmos/ibc-go/v6/modules/core/04-channel/types"
+	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	tmtypes "github.com/tendermint/tendermint/types"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -95,8 +96,11 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 
 			var ibcPacketInfo map[string]any
 
+			var optionalTxResult *coretypes.ResultTx
+
 			if berpcutils.IsEvmTx(tx) {
-				optionalTxResult, errTxResult := m.clientCtx.Client.Tx(m.ctx, tmTx.Hash(), false)
+				var errTxResult error
+				optionalTxResult, errTxResult = m.clientCtx.Client.Tx(m.ctx, tmTx.Hash(), false)
 				if errTxResult != nil {
 					m.GetLogger().Error("failed to query tx for evm information", "hash", tmTx.Hash(), "height", height, "error", errTxResult)
 					// TODO BE: find another way to handle properly when error
@@ -208,34 +212,35 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 					case *channeltypes.MsgTimeoutOnClose:
 						ibcPacketInfo = buildIbcPacketInfoFromPacket(ibcMsg.Packet, false)
 					case *ibctransfertypes.MsgTransfer:
-						optionalTxResult, errTxResult := m.clientCtx.Client.Tx(m.ctx, tmTx.Hash(), false)
-						if errTxResult != nil {
-							m.GetLogger().Error("failed to query tx", "hash", tmTx.Hash(), "height", height, "error", errTxResult)
-							errorBlocks.Add(height)
-							break
-						} else if optionalTxResult == nil || len(optionalTxResult.TxResult.Events) == 0 {
-							// ignore
-						} else {
-							for _, event := range optionalTxResult.TxResult.Events {
-								ok, kv := berpcutils.IsEventTypeWithAllAttributes(
-									event,
-									channeltypes.EventTypeSendPacket,
-									channeltypes.AttributeKeySequence,
-									channeltypes.AttributeKeySrcPort,
-									channeltypes.AttributeKeySrcChannel,
-									channeltypes.AttributeKeyDstPort,
-									channeltypes.AttributeKeyDstChannel,
-								)
+						if optionalTxResult == nil {
+							var errTxResult error
+							optionalTxResult, errTxResult = m.clientCtx.Client.Tx(m.ctx, tmTx.Hash(), false)
+							if errTxResult != nil {
+								m.GetLogger().Error("failed to query tx", "hash", tmTx.Hash(), "height", height, "error", errTxResult)
+								errorBlocks.Add(height)
+								break
+							}
+						}
 
-								if ok {
-									ibcPacketInfo = buildIbcPacketInfo(
-										kv[channeltypes.AttributeKeySequence],
-										kv[channeltypes.AttributeKeySrcPort], kv[channeltypes.AttributeKeySrcChannel],
-										kv[channeltypes.AttributeKeyDstPort], kv[channeltypes.AttributeKeyDstChannel],
-										false,
-									)
-									break
-								}
+						for _, event := range optionalTxResult.TxResult.Events {
+							ok, kv := berpcutils.IsEventTypeWithAllAttributes(
+								event,
+								channeltypes.EventTypeSendPacket,
+								channeltypes.AttributeKeySequence,
+								channeltypes.AttributeKeySrcPort,
+								channeltypes.AttributeKeySrcChannel,
+								channeltypes.AttributeKeyDstPort,
+								channeltypes.AttributeKeyDstChannel,
+							)
+
+							if ok {
+								ibcPacketInfo = buildIbcPacketInfo(
+									kv[channeltypes.AttributeKeySequence],
+									kv[channeltypes.AttributeKeySrcPort], kv[channeltypes.AttributeKeySrcChannel],
+									kv[channeltypes.AttributeKeyDstPort], kv[channeltypes.AttributeKeyDstChannel],
+									false,
+								)
+								break
 							}
 						}
 					}
