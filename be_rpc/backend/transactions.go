@@ -865,7 +865,7 @@ func (m *Backend) defaultMessageParser(msg sdk.Msg, msgIdx uint, tx *tx.Tx, txRe
 		rb := berpctypes.NewFriendlyResponseContentBuilder()
 		rb.WriteAddress(msg.Signer).WriteText(" acknowledges packet:")
 
-		m.addIbcPacketInfoIntoResponse(msg.Packet, res, rb)
+		m.addIbcPacketInfoIntoResponse(msg.Packet, false, res, rb)
 
 		rb.BuildIntoResponse(res)
 
@@ -906,7 +906,7 @@ func (m *Backend) defaultMessageParser(msg sdk.Msg, msgIdx uint, tx *tx.Tx, txRe
 		rb := berpctypes.NewFriendlyResponseContentBuilder()
 		rb.WriteAddress(msg.Signer).WriteText(" informs receive packet:")
 
-		m.addIbcPacketInfoIntoResponse(msg.Packet, res, rb)
+		m.addIbcPacketInfoIntoResponse(msg.Packet, true, res, rb)
 
 		rb.BuildIntoResponse(res)
 
@@ -928,7 +928,7 @@ func (m *Backend) defaultMessageParser(msg sdk.Msg, msgIdx uint, tx *tx.Tx, txRe
 		rb := berpctypes.NewFriendlyResponseContentBuilder()
 		rb.WriteAddress(msg.Signer).WriteText(" informs packet timed out:")
 
-		m.addIbcPacketInfoIntoResponse(msg.Packet, res, rb)
+		m.addIbcPacketInfoIntoResponse(msg.Packet, false, res, rb)
 
 		rb.BuildIntoResponse(res)
 
@@ -950,7 +950,7 @@ func (m *Backend) defaultMessageParser(msg sdk.Msg, msgIdx uint, tx *tx.Tx, txRe
 		rb := berpctypes.NewFriendlyResponseContentBuilder()
 		rb.WriteAddress(msg.Signer).WriteText(" informs closing timed out packet:")
 
-		m.addIbcPacketInfoIntoResponse(msg.Packet, res, rb)
+		m.addIbcPacketInfoIntoResponse(msg.Packet, false, res, rb)
 
 		rb.BuildIntoResponse(res)
 
@@ -1230,7 +1230,7 @@ func (m *Backend) getBankDenomsMetadata(coins sdk.Coins) map[string]banktypes.Me
 
 }
 
-func (m *Backend) addIbcPacketInfoIntoResponse(packet channeltypes.Packet, res berpctypes.GenericBackendResponse, rb berpctypes.FriendlyResponseContentBuilderI) {
+func (m *Backend) addIbcPacketInfoIntoResponse(packet channeltypes.Packet, incomingPacket bool, res berpctypes.GenericBackendResponse, rb berpctypes.FriendlyResponseContentBuilderI) {
 	var data ibctransfertypes.FungibleTokenPacketData
 	if err := ibctransfertypes.ModuleCdc.UnmarshalJSON(packet.Data, &data); err == nil {
 		token, err := berpcutils.GetIncomingIBCCoin(
@@ -1265,10 +1265,19 @@ func (m *Backend) addIbcPacketInfoIntoResponse(packet channeltypes.Packet, res b
 				WriteAddress(data.Receiver)
 		}
 
-		rb.WriteText(" through IBC via ").
-			WriteText(packet.SourcePort).WriteText("/").WriteText(packet.SourceChannel).
-			WriteText(" from ").
-			WriteText(packet.DestinationPort).WriteText("/").WriteText(packet.DestinationChannel)
+		rb.WriteText(" through IBC via ")
+
+		if incomingPacket {
+			// MsgRecvPacket
+			rb.WriteText(packet.DestinationPort).WriteText("/").WriteText(packet.DestinationChannel).
+				WriteText(" from ").
+				WriteText(packet.SourcePort).WriteText("/").WriteText(packet.SourceChannel)
+		} else {
+			// MsgAcknowledgement
+			rb.WriteText(packet.SourcePort).WriteText("/").WriteText(packet.SourceChannel).
+				WriteText(" to ").
+				WriteText(packet.DestinationPort).WriteText("/").WriteText(packet.DestinationChannel)
+		}
 
 		if data.Memo != "" {
 			res["memo"] = data.Memo
