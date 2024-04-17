@@ -1231,6 +1231,14 @@ func (m *Backend) getBankDenomsMetadata(coins sdk.Coins) map[string]banktypes.Me
 }
 
 func (m *Backend) addIbcPacketInfoIntoResponse(packet channeltypes.Packet, incomingPacket bool, res berpctypes.GenericBackendResponse, rb berpctypes.FriendlyResponseContentBuilderI) {
+	res["ibc_info"] = map[string]any{
+		"sequence":            packet.Sequence,
+		"source_port":         packet.SourcePort,
+		"source_channel":      packet.SourceChannel,
+		"destination_port":    packet.DestinationPort,
+		"destination_channel": packet.DestinationChannel,
+	}
+
 	var data ibctransfertypes.FungibleTokenPacketData
 	if err := ibctransfertypes.ModuleCdc.UnmarshalJSON(packet.Data, &data); err == nil {
 		token, err := berpcutils.GetIncomingIBCCoin(
