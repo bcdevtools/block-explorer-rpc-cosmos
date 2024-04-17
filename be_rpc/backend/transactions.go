@@ -23,6 +23,7 @@ import (
 	ibctypes "github.com/cosmos/ibc-go/v6/modules/core/02-client/types"
 	connectiontypes "github.com/cosmos/ibc-go/v6/modules/core/03-connection/types"
 	channeltypes "github.com/cosmos/ibc-go/v6/modules/core/04-channel/types"
+	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 	tmtypes "github.com/tendermint/tendermint/types"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -93,10 +94,15 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 			wasmTxAction := constants.WasmActionNone
 			var wasmTxSignature string
 
+			var ibcPacketInfo map[string]any
+
+			var optionalTxResult *coretypes.ResultTx
+
 			if berpcutils.IsEvmTx(tx) {
-				optionalTxResult, errTxResult := m.clientCtx.Client.Tx(m.ctx, tmTx.Hash(), false)
+				var errTxResult error
+				optionalTxResult, errTxResult = m.clientCtx.Client.Tx(m.ctx, tmTx.Hash(), false)
 				if errTxResult != nil {
-					m.GetLogger().Error("failed to query tx", "error", errTxResult)
+					m.GetLogger().Error("failed to query tx for evm information", "hash", tmTx.Hash(), "height", height, "error", errTxResult)
 					// TODO BE: find another way to handle properly when error
 				} else if optionalTxResult == nil {
 					// ignore
@@ -194,6 +200,51 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 				} else {
 					m.GetLogger().Error("failed to extract involvers", "error", err)
 				}
+
+				if len(ibcPacketInfo) == 0 {
+					switch ibcMsg := cosmosMsg.(type) {
+					case *channeltypes.MsgRecvPacket:
+						ibcPacketInfo = buildIbcPacketInfoFromPacket(ibcMsg.Packet, true)
+					case *channeltypes.MsgAcknowledgement:
+						ibcPacketInfo = buildIbcPacketInfoFromPacket(ibcMsg.Packet, false)
+					case *channeltypes.MsgTimeout:
+						ibcPacketInfo = buildIbcPacketInfoFromPacket(ibcMsg.Packet, false)
+					case *channeltypes.MsgTimeoutOnClose:
+						ibcPacketInfo = buildIbcPacketInfoFromPacket(ibcMsg.Packet, false)
+					case *ibctransfertypes.MsgTransfer:
+						if optionalTxResult == nil {
+							var errTxResult error
+							optionalTxResult, errTxResult = m.clientCtx.Client.Tx(m.ctx, tmTx.Hash(), false)
+							if errTxResult != nil {
+								m.GetLogger().Error("failed to query tx", "hash", tmTx.Hash(), "height", height, "error", errTxResult)
+								errorBlocks.Add(height)
+								break
+							}
+						}
+
+						for _, event := range optionalTxResult.TxResult.Events {
+							ok, kv := berpcutils.IsEventTypeWithAllAttributes(
+								event,
+								channeltypes.EventTypeSendPacket,
+								channeltypes.AttributeKeySequence,
+								channeltypes.AttributeKeySrcPort,
+								channeltypes.AttributeKeySrcChannel,
+								channeltypes.AttributeKeyDstPort,
+								channeltypes.AttributeKeyDstChannel,
+							)
+
+							if ok {
+								ibcPacketInfo = buildIbcPacketInfo(
+									kv[channeltypes.AttributeKeySequence],
+									kv[channeltypes.AttributeKeySrcPort], kv[channeltypes.AttributeKeySrcChannel],
+									kv[channeltypes.AttributeKeyDstPort], kv[channeltypes.AttributeKeyDstChannel],
+									false,
+								)
+								break
+							}
+						}
+					}
+				}
 			}
 
 			involvers.Finalize()
@@ -203,6 +254,9 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 				"type":         txType,
 				"involvers":    involvers.ToResponseObject(),
 				"messagesType": messagesType,
+			}
+			if len(ibcPacketInfo) > 0 {
+				txInfo["ibcPacketInfo"] = ibcPacketInfo
 			}
 			if txType == txTypeEvm {
 				evmTxInfo := make(map[string]any)
@@ -851,15 +905,10 @@ func (m *Backend) defaultMessageParser(msg sdk.Msg, msgIdx uint, tx *tx.Tx, txRe
 		return
 	case *channeltypes.MsgAcknowledgement:
 		res = berpctypes.GenericBackendResponse{
-			"signer":             msg.Signer,
-			"proofHeight":        msg.ProofHeight,
-			"sourcePort":         msg.Packet.SourcePort,
-			"sourceChannel":      msg.Packet.SourceChannel,
-			"destinationPort":    msg.Packet.DestinationPort,
-			"destinationChannel": msg.Packet.DestinationChannel,
-			"sequence":           msg.Packet.Sequence,
-			"timeoutHeight":      msg.Packet.TimeoutHeight,
-			"timeoutTimestamp":   msg.Packet.TimeoutTimestamp,
+			"signer":           msg.Signer,
+			"proofHeight":      msg.ProofHeight,
+			"timeoutHeight":    msg.Packet.TimeoutHeight,
+			"timeoutTimestamp": msg.Packet.TimeoutTimestamp,
 		}
 
 		rb := berpctypes.NewFriendlyResponseContentBuilder()
@@ -892,15 +941,10 @@ func (m *Backend) defaultMessageParser(msg sdk.Msg, msgIdx uint, tx *tx.Tx, txRe
 		return
 	case *channeltypes.MsgRecvPacket:
 		res = berpctypes.GenericBackendResponse{
-			"signer":             msg.Signer,
-			"proofHeight":        msg.ProofHeight,
-			"sourcePort":         msg.Packet.SourcePort,
-			"sourceChannel":      msg.Packet.SourceChannel,
-			"destinationPort":    msg.Packet.DestinationPort,
-			"destinationChannel": msg.Packet.DestinationChannel,
-			"sequence":           msg.Packet.Sequence,
-			"timeoutHeight":      msg.Packet.TimeoutHeight,
-			"timeoutEpochUTC":    msg.Packet.TimeoutTimestamp,
+			"signer":          msg.Signer,
+			"proofHeight":     msg.ProofHeight,
+			"timeoutHeight":   msg.Packet.TimeoutHeight,
+			"timeoutEpochUTC": msg.Packet.TimeoutTimestamp,
 		}
 
 		rb := berpctypes.NewFriendlyResponseContentBuilder()
@@ -913,16 +957,11 @@ func (m *Backend) defaultMessageParser(msg sdk.Msg, msgIdx uint, tx *tx.Tx, txRe
 		return
 	case *channeltypes.MsgTimeout:
 		res = berpctypes.GenericBackendResponse{
-			"signer":             msg.Signer,
-			"proofHeight":        msg.ProofHeight,
-			"sourcePort":         msg.Packet.SourcePort,
-			"sourceChannel":      msg.Packet.SourceChannel,
-			"destinationPort":    msg.Packet.DestinationPort,
-			"destinationChannel": msg.Packet.DestinationChannel,
-			"sequence":           msg.Packet.Sequence,
-			"timeoutHeight":      msg.Packet.TimeoutHeight,
-			"timeoutEpochUTC":    msg.Packet.TimeoutTimestamp,
-			"nextSequenceRecv":   msg.NextSequenceRecv,
+			"signer":           msg.Signer,
+			"proofHeight":      msg.ProofHeight,
+			"timeoutHeight":    msg.Packet.TimeoutHeight,
+			"timeoutEpochUTC":  msg.Packet.TimeoutTimestamp,
+			"nextSequenceRecv": msg.NextSequenceRecv,
 		}
 
 		rb := berpctypes.NewFriendlyResponseContentBuilder()
@@ -935,16 +974,11 @@ func (m *Backend) defaultMessageParser(msg sdk.Msg, msgIdx uint, tx *tx.Tx, txRe
 		return
 	case *channeltypes.MsgTimeoutOnClose:
 		res = berpctypes.GenericBackendResponse{
-			"signer":             msg.Signer,
-			"proofHeight":        msg.ProofHeight,
-			"sourcePort":         msg.Packet.SourcePort,
-			"sourceChannel":      msg.Packet.SourceChannel,
-			"destinationPort":    msg.Packet.DestinationPort,
-			"destinationChannel": msg.Packet.DestinationChannel,
-			"sequence":           msg.Packet.Sequence,
-			"timeoutHeight":      msg.Packet.TimeoutHeight,
-			"timeoutEpochUTC":    msg.Packet.TimeoutTimestamp,
-			"nextSequenceRecv":   msg.NextSequenceRecv,
+			"signer":           msg.Signer,
+			"proofHeight":      msg.ProofHeight,
+			"timeoutHeight":    msg.Packet.TimeoutHeight,
+			"timeoutEpochUTC":  msg.Packet.TimeoutTimestamp,
+			"nextSequenceRecv": msg.NextSequenceRecv,
 		}
 
 		rb := berpctypes.NewFriendlyResponseContentBuilder()
@@ -1231,13 +1265,7 @@ func (m *Backend) getBankDenomsMetadata(coins sdk.Coins) map[string]banktypes.Me
 }
 
 func (m *Backend) addIbcPacketInfoIntoResponse(packet channeltypes.Packet, incomingPacket bool, res berpctypes.GenericBackendResponse, rb berpctypes.FriendlyResponseContentBuilderI) {
-	res["ibc_info"] = map[string]any{
-		"sequence":            packet.Sequence,
-		"source_port":         packet.SourcePort,
-		"source_channel":      packet.SourceChannel,
-		"destination_port":    packet.DestinationPort,
-		"destination_channel": packet.DestinationChannel,
-	}
+	res["ibcPacketInfo"] = buildIbcPacketInfoFromPacket(packet, incomingPacket)
 
 	var data ibctransfertypes.FungibleTokenPacketData
 	if err := ibctransfertypes.ModuleCdc.UnmarshalJSON(packet.Data, &data); err == nil {
@@ -1486,4 +1514,24 @@ func (m *Backend) getInvolversInIbcPacketInfo(packet channeltypes.Packet) (res b
 	}
 
 	return res
+}
+
+func buildIbcPacketInfoFromPacket(packet channeltypes.Packet, incoming bool) map[string]any {
+	return buildIbcPacketInfo(
+		fmt.Sprintf("%d", packet.Sequence),
+		packet.SourcePort, packet.SourceChannel,
+		packet.DestinationPort, packet.DestinationChannel,
+		incoming,
+	)
+}
+
+func buildIbcPacketInfo(sequence, sourcePort, sourceChannel, destPort, destChannel string, incoming bool) map[string]any {
+	return map[string]any{
+		"sequence":           sequence,
+		"sourcePort":         sourcePort,
+		"sourceChannel":      sourceChannel,
+		"destinationPort":    destPort,
+		"destinationChannel": destChannel,
+		"incoming":           incoming,
+	}
 }
