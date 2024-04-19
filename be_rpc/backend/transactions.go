@@ -27,6 +27,7 @@ import (
 	tmtypes "github.com/tendermint/tendermint/types"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"math/big"
 	"regexp"
 	"strings"
 )
@@ -134,6 +135,8 @@ func (m *Backend) getTransactionsInBlock(height int64) (blockInfo map[string]any
 
 		var ibcPacketsInfo []map[string]any
 
+		txValue := sdk.Coins{}
+
 		var optionalTxResult *coretypes.ResultTx
 
 		if berpcutils.IsEvmTx(tx) {
@@ -164,6 +167,18 @@ func (m *Backend) getTransactionsInBlock(height int64) (blockInfo map[string]any
 							} else {
 								if len(input) >= 8 {
 									inputSigStr = "0x" + input[:8]
+								}
+							}
+						}
+
+						if value, ok := berpcutils.TryGetMapValueAsType[string](evmTx); ok && len(value) > 0 {
+							if strings.HasPrefix(value, "0x") && len(value) > 2 {
+								if bi, ok := new(big.Int).SetString(value[2:], 16); ok && bi.Sign() > 0 {
+									if evmModuleParams, err := m.GetModuleParams("evm"); err == nil && len(evmModuleParams) > 0 {
+										if evmDenom, found := evmModuleParams["evm_denom"].(string); found && len(evmDenom) > 0 {
+											txValue = txValue.Add(sdk.NewCoin(evmDenom, sdk.NewIntFromBigInt(bi)))
+										}
+									}
 								}
 							}
 						}
@@ -241,12 +256,24 @@ func (m *Backend) getTransactionsInBlock(height int64) (blockInfo map[string]any
 			switch ibcMsg := cosmosMsg.(type) {
 			case *channeltypes.MsgRecvPacket:
 				ibcPacketsInfo = append(ibcPacketsInfo, buildIbcPacketInfoFromPacket(ibcMsg.Packet, true))
+				if coin := getTxValueInIbcPacketInfo(ibcMsg.Packet); !coin.IsZero() {
+					txValue = txValue.Add(coin)
+				}
 			case *channeltypes.MsgAcknowledgement:
 				ibcPacketsInfo = append(ibcPacketsInfo, buildIbcPacketInfoFromPacket(ibcMsg.Packet, false))
+				if coin := getTxValueInIbcPacketInfo(ibcMsg.Packet); !coin.IsZero() {
+					txValue = txValue.Add(coin)
+				}
 			case *channeltypes.MsgTimeout:
 				ibcPacketsInfo = append(ibcPacketsInfo, buildIbcPacketInfoFromPacket(ibcMsg.Packet, false))
+				if coin := getTxValueInIbcPacketInfo(ibcMsg.Packet); !coin.IsZero() {
+					txValue = txValue.Add(coin)
+				}
 			case *channeltypes.MsgTimeoutOnClose:
 				ibcPacketsInfo = append(ibcPacketsInfo, buildIbcPacketInfoFromPacket(ibcMsg.Packet, false))
+				if coin := getTxValueInIbcPacketInfo(ibcMsg.Packet); !coin.IsZero() {
+					txValue = txValue.Add(coin)
+				}
 			case *ibctransfertypes.MsgTransfer:
 				if optionalTxResult == nil {
 					var errTxResult error
@@ -277,6 +304,37 @@ func (m *Backend) getTransactionsInBlock(height int64) (blockInfo map[string]any
 						))
 						break
 					}
+				}
+
+				if !ibcMsg.Token.IsZero() {
+					txValue = txValue.Add(ibcMsg.Token)
+				}
+			}
+
+			switch msgWithValue := cosmosMsg.(type) {
+			case *banktypes.MsgSend:
+				if !msgWithValue.Amount.IsZero() {
+					txValue = txValue.Add(msgWithValue.Amount...)
+				}
+			case *banktypes.MsgMultiSend:
+				var totalValue sdk.Coins
+				for _, output := range msgWithValue.Outputs {
+					totalValue = totalValue.Add(output.Coins...)
+				}
+				if !totalValue.IsZero() {
+					txValue = txValue.Add(totalValue...)
+				}
+			case *stakingtypes.MsgDelegate:
+				if !msgWithValue.Amount.IsZero() {
+					txValue = txValue.Add(msgWithValue.Amount)
+				}
+			case *stakingtypes.MsgUndelegate:
+				if !msgWithValue.Amount.IsZero() {
+					txValue = txValue.Add(msgWithValue.Amount)
+				}
+			case *stakingtypes.MsgBeginRedelegate:
+				if !msgWithValue.Amount.IsZero() {
+					txValue = txValue.Add(msgWithValue.Amount)
 				}
 			}
 		}
@@ -310,6 +368,9 @@ func (m *Backend) getTransactionsInBlock(height int64) (blockInfo map[string]any
 			if len(wasmTxSignature) > 0 {
 				wasmTxInfo["sig"] = strings.TrimSpace(strings.ToLower(wasmTxSignature))
 			}
+		}
+		if !txValue.IsZero() {
+			txInfo["value"] = txValue.String()
 		}
 		txsInfo = append(txsInfo, txInfo)
 	}
@@ -1436,22 +1497,22 @@ func (m *Backend) defaultMessageInvolversExtractor(msg sdk.Msg, tx *tx.Tx, tmTx 
 		return
 	case *channeltypes.MsgAcknowledgement:
 		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.Signer)
-		res.Merge(m.getInvolversInIbcPacketInfo(msg.Packet))
+		res.Merge(getInvolversInIbcPacketInfo(msg.Packet))
 		return
 	case *channeltypes.MsgChannelOpenAck:
 		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.Signer)
 		return
 	case *channeltypes.MsgRecvPacket:
 		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.Signer)
-		res.Merge(m.getInvolversInIbcPacketInfo(msg.Packet))
+		res.Merge(getInvolversInIbcPacketInfo(msg.Packet))
 		return
 	case *channeltypes.MsgTimeout:
 		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.Signer)
-		res.Merge(m.getInvolversInIbcPacketInfo(msg.Packet))
+		res.Merge(getInvolversInIbcPacketInfo(msg.Packet))
 		return
 	case *channeltypes.MsgTimeoutOnClose:
 		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.Signer)
-		res.Merge(m.getInvolversInIbcPacketInfo(msg.Packet))
+		res.Merge(getInvolversInIbcPacketInfo(msg.Packet))
 		return
 	case *slashingtypes.MsgUnjail:
 		res.AddGenericInvolvers(berpctypes.MessageInvolvers, msg.ValidatorAddr)
@@ -1524,7 +1585,7 @@ func (m *Backend) defaultMessageInvolversExtractor(msg sdk.Msg, tx *tx.Tx, tmTx 
 	}
 }
 
-func (m *Backend) getInvolversInIbcPacketInfo(packet channeltypes.Packet) (res berpctypes.MessageInvolversResult) {
+func getInvolversInIbcPacketInfo(packet channeltypes.Packet) (res berpctypes.MessageInvolversResult) {
 	res = berpctypes.NewMessageInvolversResult()
 
 	var data ibctransfertypes.FungibleTokenPacketData
@@ -1533,6 +1594,18 @@ func (m *Backend) getInvolversInIbcPacketInfo(packet channeltypes.Packet) (res b
 	}
 
 	return res
+}
+
+func getTxValueInIbcPacketInfo(packet channeltypes.Packet) sdk.Coin {
+	var data ibctransfertypes.FungibleTokenPacketData
+
+	if err := ibctransfertypes.ModuleCdc.UnmarshalJSON(packet.Data, &data); err == nil && len(data.Denom) > 0 && len(data.Amount) > 0 {
+		if amount, ok := sdk.NewIntFromString(data.Amount); ok {
+			return sdk.NewCoin(data.Denom, amount)
+		}
+	}
+
+	return sdk.Coin{}
 }
 
 func buildIbcPacketInfoFromPacket(packet channeltypes.Packet, incoming bool) map[string]any {
