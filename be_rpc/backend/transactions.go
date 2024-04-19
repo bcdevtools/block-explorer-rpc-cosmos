@@ -61,234 +61,27 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 	missingBlocks := make(berpctypes.Tracker[int64])
 	errorBlocks := make(berpctypes.Tracker[int64])
 
-	txsByBlock := make(map[int64]map[string]any)
+	blockInfoByHeight := make(map[int64]map[string]any)
 	for height := fromHeightIncluded; height <= toHeightIncluded; height++ {
-		resBlock, err := m.queryClient.GetBlockWithTxs(m.ctx, &tx.GetBlockWithTxsRequest{
-			Height: height,
-		})
+		blockInfo, missing, err := m.getTransactionsInBlock(height)
 		if err != nil {
-			m.GetLogger().Error("failed to get block", "height", height, "error", err)
+			m.GetLogger().Error("failed to get transactions in block", "height", height, "error", err)
+		}
+
+		if missing {
 			missingBlocks.Add(height)
 			continue
 		}
-		if resBlock == nil {
-			m.GetLogger().Error("block not found", "height", height)
-			missingBlocks.Add(height)
+
+		if err != nil {
+			errorBlocks.Add(height)
 			continue
 		}
 
-		const txTypeCosmos = "cosmos"
-		const txTypeEvm = "evm"
-		const txTypeWasm = "wasm"
-
-		var txsInfo []map[string]any
-		for txIdx := 0; txIdx < len(resBlock.Block.Data.Txs); txIdx++ {
-			tx := resBlock.Txs[txIdx]
-			tmTx := tmtypes.Tx(resBlock.Block.Data.Txs[txIdx])
-			txHash := strings.ToUpper(hex.EncodeToString(tmTx.Hash()))
-			txType := txTypeCosmos
-
-			evmTxAction := constants.EvmActionNone
-			var evmTxSignature string
-
-			wasmTxAction := constants.WasmActionNone
-			var wasmTxSignature string
-
-			var ibcPacketsInfo []map[string]any
-
-			var optionalTxResult *coretypes.ResultTx
-
-			if berpcutils.IsEvmTx(tx) {
-				var errTxResult error
-				optionalTxResult, errTxResult = m.clientCtx.Client.Tx(m.ctx, tmTx.Hash(), false)
-				if errTxResult != nil {
-					m.GetLogger().Error("failed to query tx for evm information", "hash", tmTx.Hash(), "height", height, "error", errTxResult)
-					// TODO BE: find another way to handle properly when error
-				} else if optionalTxResult == nil {
-					// ignore
-				} else if evmTxHash := berpcutils.GetEvmTransactionHashFromEvent(optionalTxResult.TxResult.Events); evmTxHash != nil {
-					txHash = berpcutils.NormalizeTransactionHash(evmTxHash.String(), false)
-					txType = txTypeEvm
-
-					// if the tx is an EVM tx, we need to get method signature
-					txByHash, err := m.GetTransactionByHash(txHash)
-					if err == nil && txByHash != nil {
-						if evmTx, err := berpcutils.TryConvertAnyStructToMap(txByHash["evmTx"]); err == nil && len(evmTx) > 0 {
-							var toStr, inputSigStr string
-							if to, ok := berpcutils.TryGetMapValueAsType[string](evmTx, "to"); ok && len(to) > 0 {
-								toStr = to
-							}
-							if input, ok := berpcutils.TryGetMapValueAsType[string](evmTx, "input"); ok && len(input) > 0 {
-								if strings.HasPrefix(input, "0x") {
-									if len(input) >= 10 {
-										inputSigStr = input[:10]
-									}
-								} else {
-									if len(input) >= 8 {
-										inputSigStr = "0x" + input[:8]
-									}
-								}
-							}
-							if toStr == "" {
-								evmTxAction = constants.EvmActionCreate
-							} else if inputSigStr == "" {
-								evmTxAction = constants.EvmActionTransfer
-							} else {
-								evmTxAction = constants.EvmActionCall
-								evmTxSignature = inputSigStr
-							}
-						}
-					}
-				}
-			}
-
-			var involvers berpctypes.MessageInvolversResult
-			var messagesType []string
-
-			for _, msg := range tx.Body.Messages {
-				messagesType = append(messagesType, msg.TypeUrl)
-
-				var cosmosMsg sdk.Msg
-				err := m.clientCtx.Codec.UnpackAny(msg, &cosmosMsg)
-				if err != nil {
-					errorBlocks.Add(height)
-					m.GetLogger().Error("failed to unpack message", "error", err)
-					break
-				}
-
-				if wasmTxAction == constants.WasmActionNone {
-					switch msg.TypeUrl {
-					case "/cosmwasm.wasm.v1.MsgInstantiateContract":
-						txType = txTypeWasm
-						wasmTxAction = constants.WasmActionCreate
-						wasmTxSignature = ""
-					case "/cosmwasm.wasm.v1.MsgExecuteContract":
-						txType = txTypeWasm
-						wasmTxAction = constants.WasmActionCall
-						if msgContent, err := berpcutils.FromAnyToJsonMap(msg, m.clientCtx.Codec); err == nil {
-							if execMsg, err := berpcutils.TryConvertAnyStructToMap(msgContent["msg"]); err == nil && len(execMsg) > 0 {
-								for k := range execMsg {
-									wasmTxSignature = k
-									break
-								}
-							}
-						}
-					}
-				}
-
-				var messageInvolversExtractor berpctypes.MessageInvolversExtractor
-				if extractor, found := m.messageInvolversExtractors[berpcutils.ProtoMessageName(cosmosMsg)]; found {
-					messageInvolversExtractor = extractor
-				} else {
-					messageInvolversExtractor = m.defaultMessageInvolversExtractor
-				}
-
-				resInvolvers, err := messageInvolversExtractor(cosmosMsg, tx, tmTx, m.clientCtx)
-				if err == nil {
-					if _, found := resInvolvers.GenericInvolvers()[berpctypes.MessageSenderSigner]; !found {
-						// if no signer found, try to get it from the signers
-						func() {
-							defer func() {
-								_ = recover() // omit any error
-							}()
-							if len(cosmosMsg.GetSigners()) > 0 {
-								resInvolvers.AddGenericInvolvers(berpctypes.MessageSenderSigner, cosmosMsg.GetSigners()[0].String())
-							}
-						}()
-					}
-					involvers = resInvolvers
-				} else {
-					m.GetLogger().Error("failed to extract involvers", "error", err)
-				}
-
-				switch ibcMsg := cosmosMsg.(type) {
-				case *channeltypes.MsgRecvPacket:
-					ibcPacketsInfo = append(ibcPacketsInfo, buildIbcPacketInfoFromPacket(ibcMsg.Packet, true))
-				case *channeltypes.MsgAcknowledgement:
-					ibcPacketsInfo = append(ibcPacketsInfo, buildIbcPacketInfoFromPacket(ibcMsg.Packet, false))
-				case *channeltypes.MsgTimeout:
-					ibcPacketsInfo = append(ibcPacketsInfo, buildIbcPacketInfoFromPacket(ibcMsg.Packet, false))
-				case *channeltypes.MsgTimeoutOnClose:
-					ibcPacketsInfo = append(ibcPacketsInfo, buildIbcPacketInfoFromPacket(ibcMsg.Packet, false))
-				case *ibctransfertypes.MsgTransfer:
-					if optionalTxResult == nil {
-						var errTxResult error
-						optionalTxResult, errTxResult = m.clientCtx.Client.Tx(m.ctx, tmTx.Hash(), false)
-						if errTxResult != nil {
-							m.GetLogger().Error("failed to query tx", "hash", tmTx.Hash(), "height", height, "error", errTxResult)
-							errorBlocks.Add(height)
-							break
-						}
-					}
-
-					for _, event := range optionalTxResult.TxResult.Events {
-						ok, kv := berpcutils.IsEventTypeWithAllAttributes(
-							event,
-							channeltypes.EventTypeSendPacket,
-							channeltypes.AttributeKeySequence,
-							channeltypes.AttributeKeySrcPort,
-							channeltypes.AttributeKeySrcChannel,
-							channeltypes.AttributeKeyDstPort,
-							channeltypes.AttributeKeyDstChannel,
-						)
-
-						if ok {
-							ibcPacketsInfo = append(ibcPacketsInfo, buildIbcPacketInfo(
-								kv[channeltypes.AttributeKeySequence],
-								kv[channeltypes.AttributeKeySrcPort], kv[channeltypes.AttributeKeySrcChannel],
-								kv[channeltypes.AttributeKeyDstPort], kv[channeltypes.AttributeKeyDstChannel],
-								false,
-							))
-							break
-						}
-					}
-				}
-			}
-
-			involvers.Finalize()
-
-			txInfo := map[string]any{
-				"hash":         txHash,
-				"type":         txType,
-				"involvers":    involvers.ToResponseObject(),
-				"messagesType": messagesType,
-			}
-			if len(ibcPacketsInfo) > 0 {
-				txInfo["ibcPacketsInfo"] = ibcPacketsInfo
-			}
-			if txType == txTypeEvm {
-				evmTxInfo := make(map[string]any)
-				txInfo["evmTx"] = evmTxInfo
-				if len(evmTxAction) > 0 {
-					evmTxInfo["action"] = evmTxAction
-				}
-				if len(evmTxSignature) > 0 {
-					evmTxInfo["sig"] = strings.TrimSpace(strings.ToLower(evmTxSignature))
-				}
-			} else if txType == txTypeWasm {
-				wasmTxInfo := make(map[string]any)
-				txInfo["wasmTx"] = wasmTxInfo
-				if len(wasmTxAction) > 0 {
-					wasmTxInfo["action"] = wasmTxAction
-				}
-				if len(wasmTxSignature) > 0 {
-					wasmTxInfo["sig"] = strings.TrimSpace(strings.ToLower(wasmTxSignature))
-				}
-			}
-			txsInfo = append(txsInfo, txInfo)
-		}
-
-		if errorBlocks.Has(height) {
-			continue
-		}
-
-		txsByBlock[height] = map[string]any{
-			"timeEpochUTC": resBlock.Block.Header.Time.UTC().Unix(),
-			"txs":          txsInfo,
-		}
+		blockInfoByHeight[height] = blockInfo
 	}
 
-	res["blocks"] = txsByBlock
+	res["blocks"] = blockInfoByHeight
 
 	if len(missingBlocks) > 0 {
 		res["missingBlocks"] = missingBlocks.ToSortedSlice()
@@ -298,6 +91,234 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 	}
 
 	return res, nil
+}
+
+func (m *Backend) getTransactionsInBlock(height int64) (blockInfo map[string]any, missing bool, err error) {
+	defer func() {
+		recv := recover()
+		if recv != nil {
+			err = fmt.Errorf("panic: %v", recv)
+		}
+	}()
+
+	resBlock, errGetBlock := m.queryClient.GetBlockWithTxs(m.ctx, &tx.GetBlockWithTxsRequest{
+		Height: height,
+	})
+	if errGetBlock != nil {
+		missing = true
+		err = errors.Wrap(errGetBlock, "failed to get block with txs")
+		return
+	}
+	if resBlock == nil {
+		missing = true
+		err = fmt.Errorf("block not found")
+		return
+	}
+
+	const txTypeCosmos = "cosmos"
+	const txTypeEvm = "evm"
+	const txTypeWasm = "wasm"
+
+	var txsInfo []map[string]any
+	for txIdx := 0; txIdx < len(resBlock.Block.Data.Txs); txIdx++ {
+		tx := resBlock.Txs[txIdx]
+		tmTx := tmtypes.Tx(resBlock.Block.Data.Txs[txIdx])
+		txHash := strings.ToUpper(hex.EncodeToString(tmTx.Hash()))
+		txType := txTypeCosmos
+
+		evmTxAction := constants.EvmActionNone
+		var evmTxSignature string
+
+		wasmTxAction := constants.WasmActionNone
+		var wasmTxSignature string
+
+		var ibcPacketsInfo []map[string]any
+
+		var optionalTxResult *coretypes.ResultTx
+
+		if berpcutils.IsEvmTx(tx) {
+			var errTxResult error
+			optionalTxResult, errTxResult = m.clientCtx.Client.Tx(m.ctx, tmTx.Hash(), false)
+			if errTxResult != nil {
+				m.GetLogger().Error("failed to query tx for evm information", "hash", tmTx.Hash(), "height", height, "error", errTxResult)
+				// TODO BE: find another way to handle properly when error
+			} else if optionalTxResult == nil {
+				// ignore
+			} else if evmTxHash := berpcutils.GetEvmTransactionHashFromEvent(optionalTxResult.TxResult.Events); evmTxHash != nil {
+				txHash = berpcutils.NormalizeTransactionHash(evmTxHash.String(), false)
+				txType = txTypeEvm
+
+				// if the tx is an EVM tx, we need to get method signature
+				txByHash, err := m.GetTransactionByHash(txHash)
+				if err == nil && txByHash != nil {
+					if evmTx, errConvert := berpcutils.TryConvertAnyStructToMap(txByHash["evmTx"]); errConvert == nil && len(evmTx) > 0 {
+						var toStr, inputSigStr string
+						if to, ok := berpcutils.TryGetMapValueAsType[string](evmTx, "to"); ok && len(to) > 0 {
+							toStr = to
+						}
+						if input, ok := berpcutils.TryGetMapValueAsType[string](evmTx, "input"); ok && len(input) > 0 {
+							if strings.HasPrefix(input, "0x") {
+								if len(input) >= 10 {
+									inputSigStr = input[:10]
+								}
+							} else {
+								if len(input) >= 8 {
+									inputSigStr = "0x" + input[:8]
+								}
+							}
+						}
+						if toStr == "" {
+							evmTxAction = constants.EvmActionCreate
+						} else if inputSigStr == "" {
+							evmTxAction = constants.EvmActionTransfer
+						} else {
+							evmTxAction = constants.EvmActionCall
+							evmTxSignature = inputSigStr
+						}
+					}
+				}
+			}
+		}
+
+		var involvers berpctypes.MessageInvolversResult
+		var messagesType []string
+
+		for _, msg := range tx.Body.Messages {
+			messagesType = append(messagesType, msg.TypeUrl)
+
+			var cosmosMsg sdk.Msg
+			errUnpack := m.clientCtx.Codec.UnpackAny(msg, &cosmosMsg)
+			if errUnpack != nil {
+				err = errors.Wrap(errUnpack, fmt.Sprintf("failed to unpack message %s", msg.TypeUrl))
+				return
+			}
+
+			if wasmTxAction == constants.WasmActionNone {
+				switch msg.TypeUrl {
+				case "/cosmwasm.wasm.v1.MsgInstantiateContract":
+					txType = txTypeWasm
+					wasmTxAction = constants.WasmActionCreate
+					wasmTxSignature = ""
+				case "/cosmwasm.wasm.v1.MsgExecuteContract":
+					txType = txTypeWasm
+					wasmTxAction = constants.WasmActionCall
+					if msgContent, errDecode := berpcutils.FromAnyToJsonMap(msg, m.clientCtx.Codec); errDecode == nil {
+						if execMsg, errConvert := berpcutils.TryConvertAnyStructToMap(msgContent["msg"]); errConvert == nil && len(execMsg) > 0 {
+							for k := range execMsg {
+								wasmTxSignature = k
+								break
+							}
+						}
+					}
+				}
+			}
+
+			var messageInvolversExtractor berpctypes.MessageInvolversExtractor
+			if extractor, found := m.messageInvolversExtractors[berpcutils.ProtoMessageName(cosmosMsg)]; found {
+				messageInvolversExtractor = extractor
+			} else {
+				messageInvolversExtractor = m.defaultMessageInvolversExtractor
+			}
+
+			resInvolvers, errExtractInvolvers := messageInvolversExtractor(cosmosMsg, tx, tmTx, m.clientCtx)
+			if errExtractInvolvers == nil {
+				if _, found := resInvolvers.GenericInvolvers()[berpctypes.MessageSenderSigner]; !found {
+					// if no signer found, try to get it from the signers
+					func() {
+						defer func() {
+							_ = recover() // omit any error
+						}()
+						if len(cosmosMsg.GetSigners()) > 0 {
+							resInvolvers.AddGenericInvolvers(berpctypes.MessageSenderSigner, cosmosMsg.GetSigners()[0].String())
+						}
+					}()
+				}
+				involvers = resInvolvers
+			} else {
+				m.GetLogger().Error("failed to extract involvers", "error", errExtractInvolvers)
+			}
+
+			switch ibcMsg := cosmosMsg.(type) {
+			case *channeltypes.MsgRecvPacket:
+				ibcPacketsInfo = append(ibcPacketsInfo, buildIbcPacketInfoFromPacket(ibcMsg.Packet, true))
+			case *channeltypes.MsgAcknowledgement:
+				ibcPacketsInfo = append(ibcPacketsInfo, buildIbcPacketInfoFromPacket(ibcMsg.Packet, false))
+			case *channeltypes.MsgTimeout:
+				ibcPacketsInfo = append(ibcPacketsInfo, buildIbcPacketInfoFromPacket(ibcMsg.Packet, false))
+			case *channeltypes.MsgTimeoutOnClose:
+				ibcPacketsInfo = append(ibcPacketsInfo, buildIbcPacketInfoFromPacket(ibcMsg.Packet, false))
+			case *ibctransfertypes.MsgTransfer:
+				if optionalTxResult == nil {
+					var errTxResult error
+					optionalTxResult, errTxResult = m.clientCtx.Client.Tx(m.ctx, tmTx.Hash(), false)
+					if errTxResult != nil {
+						err = errors.Wrap(errTxResult, fmt.Sprintf("failed to query tx %s", hex.EncodeToString(tmTx.Hash())))
+						return
+					}
+				}
+
+				for _, event := range optionalTxResult.TxResult.Events {
+					ok, kv := berpcutils.IsEventTypeWithAllAttributes(
+						event,
+						channeltypes.EventTypeSendPacket,
+						channeltypes.AttributeKeySequence,
+						channeltypes.AttributeKeySrcPort,
+						channeltypes.AttributeKeySrcChannel,
+						channeltypes.AttributeKeyDstPort,
+						channeltypes.AttributeKeyDstChannel,
+					)
+
+					if ok {
+						ibcPacketsInfo = append(ibcPacketsInfo, buildIbcPacketInfo(
+							kv[channeltypes.AttributeKeySequence],
+							kv[channeltypes.AttributeKeySrcPort], kv[channeltypes.AttributeKeySrcChannel],
+							kv[channeltypes.AttributeKeyDstPort], kv[channeltypes.AttributeKeyDstChannel],
+							false,
+						))
+						break
+					}
+				}
+			}
+		}
+
+		involvers.Finalize()
+
+		txInfo := map[string]any{
+			"hash":         txHash,
+			"type":         txType,
+			"involvers":    involvers.ToResponseObject(),
+			"messagesType": messagesType,
+		}
+		if len(ibcPacketsInfo) > 0 {
+			txInfo["ibcPacketsInfo"] = ibcPacketsInfo
+		}
+		if txType == txTypeEvm {
+			evmTxInfo := make(map[string]any)
+			txInfo["evmTx"] = evmTxInfo
+			if len(evmTxAction) > 0 {
+				evmTxInfo["action"] = evmTxAction
+			}
+			if len(evmTxSignature) > 0 {
+				evmTxInfo["sig"] = strings.TrimSpace(strings.ToLower(evmTxSignature))
+			}
+		} else if txType == txTypeWasm {
+			wasmTxInfo := make(map[string]any)
+			txInfo["wasmTx"] = wasmTxInfo
+			if len(wasmTxAction) > 0 {
+				wasmTxInfo["action"] = wasmTxAction
+			}
+			if len(wasmTxSignature) > 0 {
+				wasmTxInfo["sig"] = strings.TrimSpace(strings.ToLower(wasmTxSignature))
+			}
+		}
+		txsInfo = append(txsInfo, txInfo)
+	}
+
+	blockInfo = map[string]any{
+		"timeEpochUTC": resBlock.Block.Header.Time.UTC().Unix(),
+		"txs":          txsInfo,
+	}
+	return
 }
 
 func (m *Backend) GetTransactionByHash(hashStr string) (berpctypes.GenericBackendResponse, error) {
