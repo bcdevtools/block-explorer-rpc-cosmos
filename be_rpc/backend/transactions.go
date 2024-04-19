@@ -94,7 +94,7 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 			wasmTxAction := constants.WasmActionNone
 			var wasmTxSignature string
 
-			var ibcPacketInfo map[string]any
+			var ibcPacketsInfo []map[string]any
 
 			var optionalTxResult *coretypes.ResultTx
 
@@ -201,47 +201,45 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 					m.GetLogger().Error("failed to extract involvers", "error", err)
 				}
 
-				if len(ibcPacketInfo) == 0 {
-					switch ibcMsg := cosmosMsg.(type) {
-					case *channeltypes.MsgRecvPacket:
-						ibcPacketInfo = buildIbcPacketInfoFromPacket(ibcMsg.Packet, true)
-					case *channeltypes.MsgAcknowledgement:
-						ibcPacketInfo = buildIbcPacketInfoFromPacket(ibcMsg.Packet, false)
-					case *channeltypes.MsgTimeout:
-						ibcPacketInfo = buildIbcPacketInfoFromPacket(ibcMsg.Packet, false)
-					case *channeltypes.MsgTimeoutOnClose:
-						ibcPacketInfo = buildIbcPacketInfoFromPacket(ibcMsg.Packet, false)
-					case *ibctransfertypes.MsgTransfer:
-						if optionalTxResult == nil {
-							var errTxResult error
-							optionalTxResult, errTxResult = m.clientCtx.Client.Tx(m.ctx, tmTx.Hash(), false)
-							if errTxResult != nil {
-								m.GetLogger().Error("failed to query tx", "hash", tmTx.Hash(), "height", height, "error", errTxResult)
-								errorBlocks.Add(height)
-								break
-							}
+				switch ibcMsg := cosmosMsg.(type) {
+				case *channeltypes.MsgRecvPacket:
+					ibcPacketsInfo = append(ibcPacketsInfo, buildIbcPacketInfoFromPacket(ibcMsg.Packet, true))
+				case *channeltypes.MsgAcknowledgement:
+					ibcPacketsInfo = append(ibcPacketsInfo, buildIbcPacketInfoFromPacket(ibcMsg.Packet, false))
+				case *channeltypes.MsgTimeout:
+					ibcPacketsInfo = append(ibcPacketsInfo, buildIbcPacketInfoFromPacket(ibcMsg.Packet, false))
+				case *channeltypes.MsgTimeoutOnClose:
+					ibcPacketsInfo = append(ibcPacketsInfo, buildIbcPacketInfoFromPacket(ibcMsg.Packet, false))
+				case *ibctransfertypes.MsgTransfer:
+					if optionalTxResult == nil {
+						var errTxResult error
+						optionalTxResult, errTxResult = m.clientCtx.Client.Tx(m.ctx, tmTx.Hash(), false)
+						if errTxResult != nil {
+							m.GetLogger().Error("failed to query tx", "hash", tmTx.Hash(), "height", height, "error", errTxResult)
+							errorBlocks.Add(height)
+							break
 						}
+					}
 
-						for _, event := range optionalTxResult.TxResult.Events {
-							ok, kv := berpcutils.IsEventTypeWithAllAttributes(
-								event,
-								channeltypes.EventTypeSendPacket,
-								channeltypes.AttributeKeySequence,
-								channeltypes.AttributeKeySrcPort,
-								channeltypes.AttributeKeySrcChannel,
-								channeltypes.AttributeKeyDstPort,
-								channeltypes.AttributeKeyDstChannel,
-							)
+					for _, event := range optionalTxResult.TxResult.Events {
+						ok, kv := berpcutils.IsEventTypeWithAllAttributes(
+							event,
+							channeltypes.EventTypeSendPacket,
+							channeltypes.AttributeKeySequence,
+							channeltypes.AttributeKeySrcPort,
+							channeltypes.AttributeKeySrcChannel,
+							channeltypes.AttributeKeyDstPort,
+							channeltypes.AttributeKeyDstChannel,
+						)
 
-							if ok {
-								ibcPacketInfo = buildIbcPacketInfo(
-									kv[channeltypes.AttributeKeySequence],
-									kv[channeltypes.AttributeKeySrcPort], kv[channeltypes.AttributeKeySrcChannel],
-									kv[channeltypes.AttributeKeyDstPort], kv[channeltypes.AttributeKeyDstChannel],
-									false,
-								)
-								break
-							}
+						if ok {
+							ibcPacketsInfo = append(ibcPacketsInfo, buildIbcPacketInfo(
+								kv[channeltypes.AttributeKeySequence],
+								kv[channeltypes.AttributeKeySrcPort], kv[channeltypes.AttributeKeySrcChannel],
+								kv[channeltypes.AttributeKeyDstPort], kv[channeltypes.AttributeKeyDstChannel],
+								false,
+							))
+							break
 						}
 					}
 				}
@@ -255,8 +253,8 @@ func (m *Backend) GetTransactionsInBlockRange(fromHeightIncluded, toHeightInclud
 				"involvers":    involvers.ToResponseObject(),
 				"messagesType": messagesType,
 			}
-			if len(ibcPacketInfo) > 0 {
-				txInfo["ibcPacketInfo"] = ibcPacketInfo
+			if len(ibcPacketsInfo) > 0 {
+				txInfo["ibcPacketsInfo"] = ibcPacketsInfo
 			}
 			if txType == txTypeEvm {
 				evmTxInfo := make(map[string]any)
