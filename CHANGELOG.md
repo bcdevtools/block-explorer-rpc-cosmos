@@ -61,6 +61,7 @@ Templates for Unreleased:
 - (rpc) [#7](https://github.com/bcdevtools/block-explorer-rpc-cosmos/pull/7) Improve IBC messages translation & add IBC packet info into message parser
 - (rpc) [#8](https://github.com/bcdevtools/block-explorer-rpc-cosmos/pull/8) + [#9](https://github.com/bcdevtools/block-explorer-rpc-cosmos/pull/9) Add IBC packet information into `be_getTransactionsInBlockRange`
 - (rpc) [#10](https://github.com/bcdevtools/block-explorer-rpc-cosmos/pull/10) Refactor export function to reduce chance of crashing entire handler
+- (rpc) [#11](https://github.com/bcdevtools/block-explorer-rpc-cosmos/pull/11) Return transaction value in `be_getTransactionsInBlockRange` response
 
 ## v1.1.1 - 2024-04-14
 
