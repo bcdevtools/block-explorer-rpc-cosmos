@@ -171,7 +171,7 @@ func (m *Backend) getTransactionsInBlock(height int64) (blockInfo map[string]any
 							}
 						}
 
-						if value, ok := berpcutils.TryGetMapValueAsType[string](evmTx); ok && len(value) > 0 {
+						if value, ok := berpcutils.TryGetMapValueAsType[string](evmTx, "value"); ok && len(value) > 0 {
 							if strings.HasPrefix(value, "0x") && len(value) > 2 {
 								if bi, ok := new(big.Int).SetString(value[2:], 16); ok && bi.Sign() > 0 {
 									if evmModuleParams, err := m.GetModuleParams("evm"); err == nil && len(evmModuleParams) > 0 {
