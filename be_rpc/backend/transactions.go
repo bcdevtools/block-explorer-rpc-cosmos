@@ -11,7 +11,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/client"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/tx"
-	tx2 "github.com/cosmos/cosmos-sdk/x/auth/tx"
 	authztypes "github.com/cosmos/cosmos-sdk/x/authz"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	crisistypes "github.com/cosmos/cosmos-sdk/x/crisis/types"
@@ -127,7 +126,7 @@ func (m *Backend) getTransactionsInBlock(height int64) (blockInfo map[string]any
 		var tmTx, tmTx2 tmtypes.Tx
 
 		tx := resBlock.Txs[txIdx]
-		tmTx, err = m.clientCtx.TxConfig.TxEncoder()(tx2.WrapTx(tx).(sdk.Tx))
+		tmTx, err = berpcutils.ConvertTxIntoTmTx(tx, m.clientCtx.TxConfig)
 		if err != nil {
 			err = errors.Wrap(err, "failed to encode tx to tm tx")
 			return
