@@ -135,6 +135,7 @@ func (m *Backend) getTransactionsInBlock(height int64) (blockInfo map[string]any
 			return
 		}
 
+		// TODO BE: remove this check once confirmed the issue not happens again
 		if !bytes.Equal(tmTx.Hash(), recheckTmTx.Hash()) {
 			err = fmt.Errorf("tm tx mis-match between provided and encoded re-check: %s != %s", hex.EncodeToString(tmTx), hex.EncodeToString(recheckTmTx))
 			return
