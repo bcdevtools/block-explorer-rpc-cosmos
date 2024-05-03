@@ -89,7 +89,7 @@ func (m *Backend) GetValidators() (berpctypes.GenericBackendResponse, error) {
 		consAddr := sdk.ConsAddress(validator.Address).String()
 		valAddr, _, err := m.validatorsConsAddrToValAddr.GetValAddrFromConsAddr(consAddr)
 		if err != nil {
-			return nil, status.Error(codes.Internal, errors.Wrap(err, "failed to get valiator address from consensus address").Error())
+			return nil, status.Error(codes.Internal, errors.Wrap(err, "failed to get validator address from consensus address").Error())
 		}
 		res[consAddr] = map[string]any{
 			"consAddress": consAddr,
