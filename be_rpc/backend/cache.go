@@ -260,6 +260,10 @@ func (vc *validatorsConsAddrToValAddr) reloadCacheWithoutLock(height int64) erro
 		return errStakingVals
 	}
 
+	if len(stakingVals.Validators) == 0 {
+		panic(fmt.Errorf("no validators found"))
+	}
+
 	for _, val := range stakingVals.Validators {
 		consAddr, success := berpcutils.FromAnyPubKeyToConsensusAddress(val.ConsensusPubkey, vc.codec)
 		if !success {
