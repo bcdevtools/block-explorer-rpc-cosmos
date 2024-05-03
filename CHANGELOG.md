@@ -56,6 +56,12 @@ Templates for Unreleased:
 
 ## Unreleased
 
+## v1.1.4 - 2024-05-03
+
+### Bug Fixes
+
+- (rpc) [#13](https://github.com/bcdevtools/block-explorer-rpc-cosmos/pull/13) Fix validators not listed correctly
+
 ## v1.1.3 - 2024-05-03
 
 ### Bug Fixes

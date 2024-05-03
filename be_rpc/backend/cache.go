@@ -62,7 +62,7 @@ func (vc *tendermintValidatorsCache) GetValidators() (vals []*tmtypes.Validator,
 	}
 
 	if !isExpired {
-		return vc.validators, nil
+		return vc.validators[:], nil
 	}
 
 	vc.cacheController.rwMutex.Lock()
@@ -74,7 +74,7 @@ func (vc *tendermintValidatorsCache) GetValidators() (vals []*tmtypes.Validator,
 		return
 	}
 	if !isExpired { // prevent race condition by re-checking after acquiring the lock
-		return vc.validators, nil
+		return vc.validators[:], nil
 	}
 
 	errReloadCache := vc.reloadCacheWithoutLock(height)
@@ -83,7 +83,7 @@ func (vc *tendermintValidatorsCache) GetValidators() (vals []*tmtypes.Validator,
 		return
 	}
 
-	return vc.validators, nil
+	return vc.validators[:], nil
 }
 
 func (vc *tendermintValidatorsCache) IsCacheExpired() (expired bool, err error) {
@@ -123,28 +123,32 @@ func (vc *tendermintValidatorsCache) reloadCacheWithoutLock(height int64) error 
 	return nil
 }
 
-type validatorsConsAddrToValAddr struct {
-	cacheController             *baseCacheController
-	validatorsConsAddrToValAddr map[string]string
-	tmClient                    client.Client
-	stakingQueryClient          stakingtypes.QueryClient
-	codec                       codec.Codec
+type stakingValidatorsCache struct {
+	cacheController    *baseCacheController
+	validators         []cachedValidator
+	tmClient           client.Client
+	stakingQueryClient stakingtypes.QueryClient
+	codec              codec.Codec
 }
 
-func NewValidatorsConsAddrToValAddrCache(tmClient client.Client, stakingQueryClient stakingtypes.QueryClient, codec codec.Codec) *validatorsConsAddrToValAddr {
+type cachedValidator struct {
+	consAddr  string
+	validator stakingtypes.Validator
+}
+
+func NewStakingValidatorsCache(tmClient client.Client, stakingQueryClient stakingtypes.QueryClient, codec codec.Codec) *stakingValidatorsCache {
 	funcIsExpired := func(expirationAnchor, valueToCompare any) bool {
 		return valueToCompare.(int64) > expirationAnchor.(int64)
 	}
-	return &validatorsConsAddrToValAddr{
-		cacheController:             NewBaseCacheController(funcIsExpired),
-		validatorsConsAddrToValAddr: make(map[string]string),
-		tmClient:                    tmClient,
-		stakingQueryClient:          stakingQueryClient,
-		codec:                       codec,
+	return &stakingValidatorsCache{
+		cacheController:    NewBaseCacheController(funcIsExpired),
+		tmClient:           tmClient,
+		stakingQueryClient: stakingQueryClient,
+		codec:              codec,
 	}
 }
 
-func (vc *validatorsConsAddrToValAddr) GetValAddrFromConsAddr(consAddr string) (valAddr string, found bool, err error) {
+func (vc *stakingValidatorsCache) GetValidators() (vals []cachedValidator, err error) {
 	isExpired, errCheckExpired := vc.IsCacheExpired()
 	if errCheckExpired != nil {
 		err = errCheckExpired
@@ -152,8 +156,7 @@ func (vc *validatorsConsAddrToValAddr) GetValAddrFromConsAddr(consAddr string) (
 	}
 
 	if !isExpired {
-		valAddr, found = vc.validatorsConsAddrToValAddr[consAddr]
-		return
+		return vc.validators[:], nil
 	}
 
 	vc.cacheController.rwMutex.Lock()
@@ -165,8 +168,7 @@ func (vc *validatorsConsAddrToValAddr) GetValAddrFromConsAddr(consAddr string) (
 		return
 	}
 	if !isExpired { // prevent race condition by re-checking after acquiring the lock
-		valAddr, found = vc.validatorsConsAddrToValAddr[consAddr]
-		return
+		return vc.validators[:], nil
 	}
 
 	errReloadCache := vc.reloadCacheWithoutLock(height)
@@ -175,61 +177,15 @@ func (vc *validatorsConsAddrToValAddr) GetValAddrFromConsAddr(consAddr string) (
 		return
 	}
 
-	valAddr, found = vc.validatorsConsAddrToValAddr[consAddr]
-	return
+	return vc.validators[:], nil
 }
 
-func (vc *validatorsConsAddrToValAddr) GetValAddrAndConsAddr(consOrValAddr string) (valAddr, consAddr string, found bool, err error) {
-	isExpired, errCheckExpired := vc.IsCacheExpired()
-	if errCheckExpired != nil {
-		err = errCheckExpired
-		return
-	}
-
-	lookupUnexpiredData := func() (valAddr, consAddr string, found bool) {
-		for consAddr, valAddr := range vc.validatorsConsAddrToValAddr {
-			if consAddr == consOrValAddr || valAddr == consOrValAddr {
-				return valAddr, consAddr, true
-			}
-		}
-
-		return "", "", false
-	}
-
-	if !isExpired {
-		valAddr, consAddr, found = lookupUnexpiredData()
-		return
-	}
-
-	vc.cacheController.rwMutex.Lock()
-	defer vc.cacheController.rwMutex.Unlock()
-
-	isExpired, height, errCheckExpired := vc.isCacheExpired(false)
-	if errCheckExpired != nil {
-		err = errCheckExpired
-		return
-	}
-	if !isExpired { // prevent race condition by re-checking after acquiring the lock
-		valAddr, consAddr, found = lookupUnexpiredData()
-		return
-	}
-
-	errReloadCache := vc.reloadCacheWithoutLock(height)
-	if errReloadCache != nil {
-		err = errReloadCache
-		return
-	}
-
-	valAddr, consAddr, found = lookupUnexpiredData()
-	return
-}
-
-func (vc *validatorsConsAddrToValAddr) IsCacheExpired() (expired bool, err error) {
+func (vc *stakingValidatorsCache) IsCacheExpired() (expired bool, err error) {
 	expired, _, err = vc.isCacheExpired(true)
 	return
 }
 
-func (vc *validatorsConsAddrToValAddr) isCacheExpired(lock bool) (expired bool, latestHeight int64, err error) {
+func (vc *stakingValidatorsCache) isCacheExpired(lock bool) (expired bool, latestHeight int64, err error) {
 	resStatus, err := vc.tmClient.Status(context.Background())
 	if err != nil {
 		return false, 0, err
@@ -246,7 +202,7 @@ func (vc *validatorsConsAddrToValAddr) isCacheExpired(lock bool) (expired bool, 
 }
 
 // reloadCacheWithoutLock performs reload cache. Lock acquire must be performed before calling this.
-func (vc *validatorsConsAddrToValAddr) reloadCacheWithoutLock(height int64) error {
+func (vc *stakingValidatorsCache) reloadCacheWithoutLock(height int64) error {
 	var perPage = 200
 
 	stakingVals, errStakingVals := vc.stakingQueryClient.Validators(context.Background(), &stakingtypes.QueryValidatorsRequest{
@@ -266,7 +222,10 @@ func (vc *validatorsConsAddrToValAddr) reloadCacheWithoutLock(height int64) erro
 		}
 
 		consAddrStr := consAddr.String()
-		vc.validatorsConsAddrToValAddr[consAddrStr] = val.OperatorAddress
+		vc.validators = append(vc.validators, cachedValidator{
+			consAddr:  consAddrStr,
+			validator: val,
+		})
 	}
 
 	vc.cacheController.UpdateExpirationAnchor(height + validatorsCacheExpiration)
