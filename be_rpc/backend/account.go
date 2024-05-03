@@ -146,11 +146,24 @@ func (m *Backend) GetValidatorAccount(consOrValAddr string) (berpctypes.GenericB
 		res = res.ReInitializeIfNil()
 	}
 
-	valAddr, consAddr, found, err := m.validatorsConsAddrToValAddr.GetValAddrAndConsAddr(consOrValAddr)
+	stakingValidators, err := m.stakingValidatorsCache.GetValidators()
 	if err != nil {
-		return nil, err
+		return nil, status.Error(codes.Internal, errors.Wrap(err, "failed to get staking validators").Error())
 	}
-	if !found {
+	if len(stakingValidators) < 1 {
+		return nil, status.Error(codes.NotFound, "validator could not be found")
+	}
+
+	var valAddr, consAddr string
+	for _, validator := range stakingValidators {
+		if validator.consAddr == consOrValAddr || validator.validator.OperatorAddress == consOrValAddr {
+			valAddr = validator.validator.OperatorAddress
+			consAddr = validator.consAddr
+			break
+		}
+	}
+
+	if valAddr == "" || consAddr == "" {
 		return nil, status.Error(codes.NotFound, "validator could not be found")
 	}
 

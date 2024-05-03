@@ -89,10 +89,9 @@ type Backend struct {
 	externalServices           berpctypes.ExternalServices
 
 	// cache
-	bech32Cfg                   berpctypes.Bech32Config
-	tendermintValidatorsCache   *tendermintValidatorsCache
-	validatorsConsAddrToValAddr *validatorsConsAddrToValAddr
-	stakingValidatorsCache      *stakingValidatorsCache
+	bech32Cfg                 berpctypes.Bech32Config
+	tendermintValidatorsCache *tendermintValidatorsCache
+	stakingValidatorsCache    *stakingValidatorsCache
 }
 
 // NewBackend creates a new Backend instance for RollApp Block Explorer
@@ -124,11 +123,6 @@ func NewBackend(
 		bech32Cfg: berpctypes.NewBech32Config(),
 		tendermintValidatorsCache: NewTendermintValidatorsCache(
 			clientCtx.Client,
-		),
-		validatorsConsAddrToValAddr: NewValidatorsConsAddrToValAddrCache(
-			clientCtx.Client,
-			queryClient.StakingQueryClient,
-			clientCtx.Codec,
 		),
 		stakingValidatorsCache: NewStakingValidatorsCache(
 			clientCtx.Client,

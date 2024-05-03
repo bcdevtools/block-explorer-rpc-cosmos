@@ -79,24 +79,38 @@ func (m *Backend) GetStakingInfo(delegatorAddr string) (berpctypes.GenericBacken
 }
 
 func (m *Backend) GetValidators() (berpctypes.GenericBackendResponse, error) {
-	validators, err := m.tendermintValidatorsCache.GetValidators()
+	tmValidators, err := m.tendermintValidatorsCache.GetValidators()
 	if err != nil {
-		return nil, status.Error(codes.Internal, errors.Wrap(err, "failed to get validators").Error())
+		return nil, status.Error(codes.Internal, errors.Wrap(err, "failed to get tendermint validators").Error())
+	}
+
+	stakingValidators, err := m.stakingValidatorsCache.GetValidators()
+	if err != nil {
+		return nil, status.Error(codes.Internal, errors.Wrap(err, "failed to get staking validators").Error())
 	}
 
 	res := make(berpctypes.GenericBackendResponse)
-	for _, validator := range validators {
-		consAddr := sdk.ConsAddress(validator.Address).String()
-		valAddr, _, err := m.validatorsConsAddrToValAddr.GetValAddrFromConsAddr(consAddr)
-		if err != nil {
-			return nil, status.Error(codes.Internal, errors.Wrap(err, "failed to get validator address from consensus address").Error())
-		}
-		res[consAddr] = map[string]any{
+
+	for _, stakingValidator := range stakingValidators {
+		consAddr := stakingValidator.consAddr
+		valInfo := map[string]any{
 			"consAddress": consAddr,
-			"valAddress":  valAddr,
-			"pubKeyType":  validator.PubKey.Type(),
-			"votingPower": validator.VotingPower,
+			"valAddress":  stakingValidator.validator.OperatorAddress,
+			"pubKeyType":  "",
+			"votingPower": -1,
 		}
+
+		for _, tmValidator := range tmValidators {
+			if sdk.ConsAddress(tmValidator.Address).String() != consAddr {
+				continue
+			}
+
+			valInfo["pubKeyType"] = tmValidator.PubKey.Type()
+			valInfo["votingPower"] = tmValidator.VotingPower
+			break
+		}
+
+		res[consAddr] = valInfo
 	}
 
 	return res, nil
