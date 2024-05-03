@@ -123,6 +123,116 @@ func (vc *tendermintValidatorsCache) reloadCacheWithoutLock(height int64) error 
 	return nil
 }
 
+type stakingValidatorsCache struct {
+	cacheController    *baseCacheController
+	validators         []cachedValidator
+	tmClient           client.Client
+	stakingQueryClient stakingtypes.QueryClient
+	codec              codec.Codec
+}
+
+type cachedValidator struct {
+	consAddr  string
+	validator stakingtypes.Validator
+}
+
+func NewStakingValidatorsCache(tmClient client.Client, stakingQueryClient stakingtypes.QueryClient, codec codec.Codec) *stakingValidatorsCache {
+	funcIsExpired := func(expirationAnchor, valueToCompare any) bool {
+		return valueToCompare.(int64) > expirationAnchor.(int64)
+	}
+	return &stakingValidatorsCache{
+		cacheController:    NewBaseCacheController(funcIsExpired),
+		tmClient:           tmClient,
+		stakingQueryClient: stakingQueryClient,
+		codec:              codec,
+	}
+}
+
+func (vc *stakingValidatorsCache) GetValidators() (vals []cachedValidator, err error) {
+	isExpired, errCheckExpired := vc.IsCacheExpired()
+	if errCheckExpired != nil {
+		err = errCheckExpired
+		return
+	}
+
+	if !isExpired {
+		return vc.validators[:], nil
+	}
+
+	vc.cacheController.rwMutex.Lock()
+	defer vc.cacheController.rwMutex.Unlock()
+
+	isExpired, height, errCheckExpired := vc.isCacheExpired(false)
+	if errCheckExpired != nil {
+		err = errCheckExpired
+		return
+	}
+	if !isExpired { // prevent race condition by re-checking after acquiring the lock
+		return vc.validators[:], nil
+	}
+
+	errReloadCache := vc.reloadCacheWithoutLock(height)
+	if errReloadCache != nil {
+		err = errReloadCache
+		return
+	}
+
+	return vc.validators[:], nil
+}
+
+func (vc *stakingValidatorsCache) IsCacheExpired() (expired bool, err error) {
+	expired, _, err = vc.isCacheExpired(true)
+	return
+}
+
+func (vc *stakingValidatorsCache) isCacheExpired(lock bool) (expired bool, latestHeight int64, err error) {
+	resStatus, err := vc.tmClient.Status(context.Background())
+	if err != nil {
+		return false, 0, err
+	}
+
+	if lock {
+		vc.cacheController.rwMutex.Lock()
+		defer vc.cacheController.rwMutex.Unlock()
+	}
+
+	latestHeight = resStatus.SyncInfo.LatestBlockHeight
+	expired = vc.cacheController.IsExpired(latestHeight)
+	return
+}
+
+// reloadCacheWithoutLock performs reload cache. Lock acquire must be performed before calling this.
+func (vc *stakingValidatorsCache) reloadCacheWithoutLock(height int64) error {
+	var perPage = 200
+
+	stakingVals, errStakingVals := vc.stakingQueryClient.Validators(context.Background(), &stakingtypes.QueryValidatorsRequest{
+		Pagination: &query.PageRequest{
+			Offset: 0,
+			Limit:  uint64(perPage),
+		},
+	})
+	if errStakingVals != nil {
+		return errStakingVals
+	}
+
+	for _, val := range stakingVals.Validators {
+		consAddr, success := berpcutils.FromAnyPubKeyToConsensusAddress(val.ConsensusPubkey, vc.codec)
+		if !success {
+			continue
+		}
+
+		consAddrStr := consAddr.String()
+		vc.validators = append(vc.validators, cachedValidator{
+			consAddr:  consAddrStr,
+			validator: val,
+		})
+	}
+
+	vc.cacheController.UpdateExpirationAnchor(height + validatorsCacheExpiration)
+
+	return nil
+}
+
 type validatorsConsAddrToValAddr struct {
 	cacheController             *baseCacheController
 	validatorsConsAddrToValAddr map[string]string
