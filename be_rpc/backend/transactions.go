@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"bytes"
 	"cosmossdk.io/errors"
 	"encoding/hex"
 	"fmt"
@@ -121,9 +122,25 @@ func (m *Backend) getTransactionsInBlock(height int64) (blockInfo map[string]any
 	const txTypeWasm = "wasm"
 
 	var txsInfo []map[string]any
-	for txIdx := 0; txIdx < len(resBlock.Block.Data.Txs); txIdx++ {
+	for txIdx := 0; txIdx < len(resBlock.Txs); txIdx++ {
+		var tmTx, recheckTmTx tmtypes.Tx
+
 		tx := resBlock.Txs[txIdx]
-		tmTx := tmtypes.Tx(resBlock.Block.Data.Txs[txIdx])
+
+		tmTx = resBlock.Block.Data.Txs[txIdx]
+
+		recheckTmTx, err = berpcutils.ConvertTxIntoTmTx(tx, m.clientCtx.TxConfig)
+		if err != nil {
+			err = errors.Wrap(err, "failed to encode tx to tm tx")
+			return
+		}
+
+		// TODO BE: remove this check once confirmed the issue not happens again
+		if !bytes.Equal(tmTx.Hash(), recheckTmTx.Hash()) {
+			err = fmt.Errorf("tm tx mis-match between provided and encoded re-check: %s != %s", hex.EncodeToString(tmTx), hex.EncodeToString(recheckTmTx))
+			return
+		}
+
 		txHash := strings.ToUpper(hex.EncodeToString(tmTx.Hash()))
 		txType := txTypeCosmos
 

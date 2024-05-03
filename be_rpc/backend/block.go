@@ -1,10 +1,13 @@
 package backend
 
 import (
+	"bytes"
 	"encoding/hex"
+	"fmt"
 	berpctypes "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/types"
 	berpcutils "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/utils"
 	"github.com/cosmos/cosmos-sdk/types/tx"
+	"github.com/pkg/errors"
 	tmtypes "github.com/tendermint/tendermint/types"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -53,6 +56,18 @@ func (m *Backend) GetBlockByNumber(height int64) (berpctypes.GenericBackendRespo
 	txsInfo := make([]map[string]any, 0)
 	for i, tx := range resBlock.Txs {
 		tmTx := tmtypes.Tx(resBlock.Block.Data.Txs[i])
+		recheckTmTx, err := berpcutils.ConvertTxIntoTmTx(tx, m.clientCtx.TxConfig)
+		if err != nil {
+			err = errors.Wrap(err, "failed to encode tx to tm tx")
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+
+		// TODO BE: remove this check once confirmed the issue not happens again
+		if !bytes.Equal(tmTx.Hash(), recheckTmTx.Hash()) {
+			err = fmt.Errorf("tm tx mis-match between provided and encoded re-check: %s != %s", hex.EncodeToString(tmTx), hex.EncodeToString(recheckTmTx))
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+
 		txHash := strings.ToUpper(hex.EncodeToString(tmTx.Hash()))
 		txType := "cosmos"
 
