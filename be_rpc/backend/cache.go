@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"fmt"
 	berpcutils "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/utils"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/types/query"
@@ -262,7 +263,8 @@ func (vc *validatorsConsAddrToValAddr) reloadCacheWithoutLock(height int64) erro
 	for _, val := range stakingVals.Validators {
 		consAddr, success := berpcutils.FromAnyPubKeyToConsensusAddress(val.ConsensusPubkey, vc.codec)
 		if !success {
-			continue
+			panic(fmt.Sprintf("failed to convert consensus address of type %s which map to %s", val.ConsensusPubkey.TypeUrl, val.OperatorAddress))
+			//continue
 		}
 
 		consAddrStr := consAddr.String()
