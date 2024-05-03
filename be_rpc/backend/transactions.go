@@ -123,18 +123,20 @@ func (m *Backend) getTransactionsInBlock(height int64) (blockInfo map[string]any
 
 	var txsInfo []map[string]any
 	for txIdx := 0; txIdx < len(resBlock.Txs); txIdx++ {
-		var tmTx, tmTx2 tmtypes.Tx
+		var tmTx, recheckTmTx tmtypes.Tx
 
 		tx := resBlock.Txs[txIdx]
-		tmTx, err = berpcutils.ConvertTxIntoTmTx(tx, m.clientCtx.TxConfig)
+
+		tmTx = resBlock.Block.Data.Txs[txIdx]
+
+		recheckTmTx, err = berpcutils.ConvertTxIntoTmTx(tx, m.clientCtx.TxConfig)
 		if err != nil {
 			err = errors.Wrap(err, "failed to encode tx to tm tx")
 			return
 		}
 
-		tmTx2 = resBlock.Block.Data.Txs[txIdx]
-		if !bytes.Equal(tmTx.Hash(), tmTx2.Hash()) {
-			err = fmt.Errorf("tm tx mis-match: %s != %s", hex.EncodeToString(tmTx), hex.EncodeToString(tmTx2))
+		if !bytes.Equal(tmTx.Hash(), recheckTmTx.Hash()) {
+			err = fmt.Errorf("tm tx mis-match between provided and encoded re-check: %s != %s", hex.EncodeToString(tmTx), hex.EncodeToString(recheckTmTx))
 			return
 		}
 
