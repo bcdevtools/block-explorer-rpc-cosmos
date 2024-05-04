@@ -87,6 +87,9 @@ func (m *Backend) GetBlockByNumber(height int64) (berpctypes.GenericBackendRespo
 		evmTxAction := constants.EvmActionNone
 		var evmTxSignature string
 
+		wasmTxAction := constants.WasmActionNone
+		var wasmTxSignature string
+
 		if berpcutils.IsEvmTx(tx) {
 			if evmTxHash := berpcutils.GetEvmTransactionHashFromEvent(txResult.Events); evmTxHash != nil {
 				txHash = berpcutils.NormalizeTransactionHash(evmTxHash.String(), false)
@@ -100,9 +103,18 @@ func (m *Backend) GetBlockByNumber(height int64) (berpctypes.GenericBackendRespo
 			}
 		}
 
+		for _, msg := range tx.Body.Messages {
+			_absolutelyWasmTx, _wasmTxAction, _wasmTxSignature := m.getWasmTransactionInfo(msg)
+			if _absolutelyWasmTx && _wasmTxAction != constants.WasmActionNone {
+				txType = txTypeWasm
+				wasmTxAction = _wasmTxAction
+				wasmTxSignature = _wasmTxSignature
+				break
+			}
+		}
+
 		txInfo := map[string]any{
 			"hash":     txHash,
-			"type":     txType,
 			"code":     txResult.Code,
 			"gasUsed":  txResult.GasUsed,
 			"gasLimit": txResult.GasWanted,
@@ -138,7 +150,18 @@ func (m *Backend) GetBlockByNumber(height int64) (berpctypes.GenericBackendRespo
 			if len(evmTxSignature) > 0 {
 				evmTxInfo["sig"] = strings.TrimSpace(strings.ToLower(evmTxSignature))
 			}
+		} else if txType == txTypeWasm {
+			wasmTxInfo := make(map[string]any)
+			txInfo["wasmTx"] = wasmTxInfo
+			if len(wasmTxAction) > 0 {
+				wasmTxInfo["action"] = wasmTxAction
+			}
+			if len(wasmTxSignature) > 0 {
+				wasmTxInfo["sig"] = strings.TrimSpace(strings.ToLower(wasmTxSignature))
+			}
 		}
+
+		txInfo["type"] = txType
 
 		txsInfo = append(txsInfo, txInfo)
 	}
