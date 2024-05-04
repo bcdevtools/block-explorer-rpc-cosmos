@@ -3,6 +3,7 @@ package backend
 import (
 	"encoding/hex"
 	"fmt"
+	"github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/constants"
 	berpctypes "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/types"
 	berpcutils "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/utils"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -75,20 +76,45 @@ func (m *Backend) GetBlockByNumber(height int64) (berpctypes.GenericBackendRespo
 		}
 
 		txHash := strings.ToUpper(hex.EncodeToString(tmTx.Hash()))
-		txType := "cosmos"
+
+		const txTypeCosmos = "cosmos"
+		const txTypeEvm = "evm"
+		const txTypeWasm = "wasm"
+		txType := txTypeCosmos
 
 		txResult := txResponse.TxResponse
+
+		evmTxAction := constants.EvmActionNone
+		var evmTxSignature string
+
+		wasmTxAction := constants.WasmActionNone
+		var wasmTxSignature string
 
 		if berpcutils.IsEvmTx(tx) {
 			if evmTxHash := berpcutils.GetEvmTransactionHashFromEvent(txResult.Events); evmTxHash != nil {
 				txHash = berpcutils.NormalizeTransactionHash(evmTxHash.String(), false)
-				txType = "evm"
+				txType = txTypeEvm
+
+				_absolutelyEvmTx, _evmTxAction, _evmTxSignature, _, errEvmTxInfo := m.getEvmTransactionInfo(txHash)
+				if errEvmTxInfo == nil && _absolutelyEvmTx && _evmTxAction != constants.EvmActionNone {
+					evmTxAction = _evmTxAction
+					evmTxSignature = _evmTxSignature
+				}
+			}
+		}
+
+		for _, msg := range tx.Body.Messages {
+			_absolutelyWasmTx, _wasmTxAction, _wasmTxSignature := m.getWasmTransactionInfo(msg)
+			if _absolutelyWasmTx && _wasmTxAction != constants.WasmActionNone {
+				txType = txTypeWasm
+				wasmTxAction = _wasmTxAction
+				wasmTxSignature = _wasmTxSignature
+				break
 			}
 		}
 
 		txInfo := map[string]any{
 			"hash":     txHash,
-			"type":     txType,
 			"code":     txResult.Code,
 			"gasUsed":  txResult.GasUsed,
 			"gasLimit": txResult.GasWanted,
@@ -114,6 +140,28 @@ func (m *Backend) GetBlockByNumber(height int64) (berpctypes.GenericBackendRespo
 				}
 			}
 		}
+
+		if txType == txTypeEvm {
+			evmTxInfo := make(map[string]any)
+			txInfo["evmTx"] = evmTxInfo
+			if len(evmTxAction) > 0 {
+				evmTxInfo["action"] = evmTxAction
+			}
+			if len(evmTxSignature) > 0 {
+				evmTxInfo["sig"] = strings.TrimSpace(strings.ToLower(evmTxSignature))
+			}
+		} else if txType == txTypeWasm {
+			wasmTxInfo := make(map[string]any)
+			txInfo["wasmTx"] = wasmTxInfo
+			if len(wasmTxAction) > 0 {
+				wasmTxInfo["action"] = wasmTxAction
+			}
+			if len(wasmTxSignature) > 0 {
+				wasmTxInfo["sig"] = strings.TrimSpace(strings.ToLower(wasmTxSignature))
+			}
+		}
+
+		txInfo["type"] = txType
 
 		txsInfo = append(txsInfo, txInfo)
 	}
