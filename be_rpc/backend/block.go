@@ -1,16 +1,17 @@
 package backend
 
 import (
-	"bytes"
 	"encoding/hex"
 	"fmt"
 	berpctypes "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/types"
 	berpcutils "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/utils"
-	"github.com/cosmos/cosmos-sdk/types/tx"
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	tx "github.com/cosmos/cosmos-sdk/types/tx"
 	"github.com/pkg/errors"
 	tmtypes "github.com/tendermint/tendermint/types"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"reflect"
 	"strings"
 )
 
@@ -37,14 +38,6 @@ func (m *Backend) GetBlockByNumber(height int64) (berpctypes.GenericBackendRespo
 		return nil, status.Error(codes.NotFound, "block not found")
 	}
 
-	resBlockResults, err := m.clientCtx.Client.BlockResults(m.ctx, &height)
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-	if resBlockResults == nil {
-		return nil, status.Error(codes.NotFound, "block results not found")
-	}
-
 	block := resBlock.Block
 
 	response := berpctypes.GenericBackendResponse{
@@ -53,25 +46,38 @@ func (m *Backend) GetBlockByNumber(height int64) (berpctypes.GenericBackendRespo
 		"timeEpochUTC": block.Header.Time.UTC().Unix(),
 	}
 
+	sdkCtx := sdk.NewContext(nil, resBlock.Block.Header, false, nil).
+		WithBlockHeight(resBlock.Block.Header.Height).
+		WithBlockTime(resBlock.Block.Header.Time)
+	queryCtx := sdk.WrapSDKContext(sdkCtx)
+
 	txsInfo := make([]map[string]any, 0)
-	for i, tx := range resBlock.Txs {
-		tmTx := tmtypes.Tx(resBlock.Block.Data.Txs[i])
-		recheckTmTx, err := berpcutils.ConvertTxIntoTmTx(tx, m.clientCtx.TxConfig)
-		if err != nil {
-			err = errors.Wrap(err, "failed to encode tx to tm tx")
+	for _, txBz := range resBlock.Block.Data.Txs {
+		tmTx := tmtypes.Tx(txBz)
+		txResponse, errGetTx := m.queryClient.GetTx(queryCtx, &tx.GetTxRequest{
+			Hash: fmt.Sprintf("%X", tmTx.Hash()),
+		})
+		if errGetTx != nil {
+			if strings.Contains(errGetTx.Error(), "not found") {
+				continue
+			}
+			err := errors.Wrap(errGetTx, fmt.Sprintf("failed to get tx %X", tmTx.Hash()))
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 
+		tx := txResponse.Tx
+		recheckTx := resBlock.Txs[len(txsInfo)]
+
 		// TODO BE: remove this check once confirmed the issue not happens again
-		if !bytes.Equal(tmTx.Hash(), recheckTmTx.Hash()) {
-			err = fmt.Errorf("tm tx mis-match between provided and encoded re-check: %s != %s", hex.EncodeToString(tmTx), hex.EncodeToString(recheckTmTx))
+		if !reflect.DeepEqual(*tx, *recheckTx) {
+			err := fmt.Errorf("txs mismatch, expected %v, got %v", tx, recheckTx)
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 
 		txHash := strings.ToUpper(hex.EncodeToString(tmTx.Hash()))
 		txType := "cosmos"
 
-		txResult := resBlockResults.TxsResults[i]
+		txResult := txResponse.TxResponse
 
 		if berpcutils.IsEvmTx(tx) {
 			if evmTxHash := berpcutils.GetEvmTransactionHashFromEvent(txResult.Events); evmTxHash != nil {

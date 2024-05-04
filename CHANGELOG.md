@@ -56,6 +56,12 @@ Templates for Unreleased:
 
 ## Unreleased
 
+## v1.1.5 - 2024-05-05
+
+### Bug Fixes
+
+- (rpc) [#14](https://github.com/bcdevtools/block-explorer-rpc-cosmos/pull/14) Fix RPC crash due to wrong tx consumption logic (p2)
+
 ## v1.1.4 - 2024-05-03
 
 ### Bug Fixes

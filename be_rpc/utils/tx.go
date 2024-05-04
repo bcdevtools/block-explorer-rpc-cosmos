@@ -2,14 +2,11 @@ package utils
 
 import (
 	berpctypes "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/types"
-	"github.com/cosmos/cosmos-sdk/client"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/tx"
-	authtx "github.com/cosmos/cosmos-sdk/x/auth/tx"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gogo/protobuf/proto"
 	abci "github.com/tendermint/tendermint/abci/types"
-	tmtypes "github.com/tendermint/tendermint/types"
 	"strings"
 )
 
@@ -58,8 +55,4 @@ func GetEvmTransactionHashFromEvent(events []abci.Event) *common.Hash {
 		}
 	}
 	return nil
-}
-
-func ConvertTxIntoTmTx(tx *tx.Tx, txConfig client.TxConfig) (tmtypes.Tx, error) {
-	return txConfig.TxEncoder()(authtx.WrapTx(tx).(sdk.Tx))
 }

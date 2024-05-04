@@ -1,7 +1,6 @@
 package backend
 
 import (
-	"bytes"
 	"cosmossdk.io/errors"
 	"encoding/hex"
 	"fmt"
@@ -29,6 +28,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"math/big"
+	"reflect"
 	"regexp"
 	"strings"
 )
@@ -121,23 +121,31 @@ func (m *Backend) getTransactionsInBlock(height int64) (blockInfo map[string]any
 	const txTypeEvm = "evm"
 	const txTypeWasm = "wasm"
 
+	sdkCtx := sdk.NewContext(nil, resBlock.Block.Header, false, nil).
+		WithBlockHeight(resBlock.Block.Header.Height).
+		WithBlockTime(resBlock.Block.Header.Time)
+	queryCtx := sdk.WrapSDKContext(sdkCtx)
+
 	var txsInfo []map[string]any
-	for txIdx := 0; txIdx < len(resBlock.Txs); txIdx++ {
-		var tmTx, recheckTmTx tmtypes.Tx
-
-		tx := resBlock.Txs[txIdx]
-
-		tmTx = resBlock.Block.Data.Txs[txIdx]
-
-		recheckTmTx, err = berpcutils.ConvertTxIntoTmTx(tx, m.clientCtx.TxConfig)
-		if err != nil {
-			err = errors.Wrap(err, "failed to encode tx to tm tx")
+	for _, txBz := range resBlock.Block.Data.Txs {
+		tmTx := tmtypes.Tx(txBz)
+		txResponse, errGetTx := m.queryClient.GetTx(queryCtx, &tx.GetTxRequest{
+			Hash: fmt.Sprintf("%X", tmTx.Hash()),
+		})
+		if errGetTx != nil {
+			if strings.Contains(errGetTx.Error(), "not found") {
+				continue
+			}
+			err = errors.Wrap(errGetTx, fmt.Sprintf("failed to get tx %X", tmTx.Hash()))
 			return
 		}
 
+		tx := txResponse.Tx
+		recheckTx := resBlock.Txs[len(txsInfo)]
+
 		// TODO BE: remove this check once confirmed the issue not happens again
-		if !bytes.Equal(tmTx.Hash(), recheckTmTx.Hash()) {
-			err = fmt.Errorf("tm tx mis-match between provided and encoded re-check: %s != %s", hex.EncodeToString(tmTx), hex.EncodeToString(recheckTmTx))
+		if !reflect.DeepEqual(*tx, *recheckTx) {
+			err = fmt.Errorf("txs mismatch, expected %v, got %v", tx, recheckTx)
 			return
 		}
 
