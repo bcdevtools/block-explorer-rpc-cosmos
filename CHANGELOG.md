@@ -56,6 +56,12 @@ Templates for Unreleased:
 
 ## Unreleased
 
+## v1.1.6 - 2024-05-05
+
+### Improvements
+
+- (rpc) [#15](https://github.com/bcdevtools/block-explorer-rpc-cosmos/pull/15) Returns EVM/Wasm tx action & sig info in `be_getBlockByNumber` response
+
 ## v1.1.5 - 2024-05-05
 
 ### Bug Fixes
