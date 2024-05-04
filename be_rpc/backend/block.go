@@ -3,6 +3,7 @@ package backend
 import (
 	"encoding/hex"
 	"fmt"
+	"github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/constants"
 	berpctypes "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/types"
 	berpcutils "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/utils"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -75,14 +76,27 @@ func (m *Backend) GetBlockByNumber(height int64) (berpctypes.GenericBackendRespo
 		}
 
 		txHash := strings.ToUpper(hex.EncodeToString(tmTx.Hash()))
-		txType := "cosmos"
+
+		const txTypeCosmos = "cosmos"
+		const txTypeEvm = "evm"
+		const txTypeWasm = "wasm"
+		txType := txTypeCosmos
 
 		txResult := txResponse.TxResponse
+
+		evmTxAction := constants.EvmActionNone
+		var evmTxSignature string
 
 		if berpcutils.IsEvmTx(tx) {
 			if evmTxHash := berpcutils.GetEvmTransactionHashFromEvent(txResult.Events); evmTxHash != nil {
 				txHash = berpcutils.NormalizeTransactionHash(evmTxHash.String(), false)
-				txType = "evm"
+				txType = txTypeEvm
+
+				_evmTxAction, _evmTxSignature, _, errEvmTxInfo := m.getEvmTransactionInfo(txHash)
+				if errEvmTxInfo == nil && _evmTxAction != constants.EvmActionNone {
+					evmTxAction = _evmTxAction
+					evmTxSignature = _evmTxSignature
+				}
 			}
 		}
 
@@ -112,6 +126,17 @@ func (m *Backend) GetBlockByNumber(height int64) (berpctypes.GenericBackendRespo
 					"tipper": tx.AuthInfo.Tip.Tipper,
 					"amount": berpcutils.CoinsToMap(tx.AuthInfo.Tip.Amount...),
 				}
+			}
+		}
+
+		if txType == txTypeEvm {
+			evmTxInfo := make(map[string]any)
+			txInfo["evmTx"] = evmTxInfo
+			if len(evmTxAction) > 0 {
+				evmTxInfo["action"] = evmTxAction
+			}
+			if len(evmTxSignature) > 0 {
+				evmTxInfo["sig"] = strings.TrimSpace(strings.ToLower(evmTxSignature))
 			}
 		}
 
