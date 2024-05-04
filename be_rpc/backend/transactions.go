@@ -8,6 +8,7 @@ import (
 	berpctypes "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/types"
 	berpcutils "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/utils"
 	"github.com/cosmos/cosmos-sdk/client"
+	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/tx"
 	authztypes "github.com/cosmos/cosmos-sdk/x/authz"
@@ -176,8 +177,8 @@ func (m *Backend) getTransactionsInBlock(height int64) (blockInfo map[string]any
 				txHash = berpcutils.NormalizeTransactionHash(evmTxHash.String(), false)
 				txType = txTypeEvm
 
-				_evmTxAction, _evmTxSignature, _txValue, errEvmTxInfo := m.getEvmTransactionInfo(txHash)
-				if errEvmTxInfo == nil && _evmTxAction != constants.EvmActionNone {
+				_absolutelyEvmTx, _evmTxAction, _evmTxSignature, _txValue, errEvmTxInfo := m.getEvmTransactionInfo(txHash)
+				if errEvmTxInfo == nil && _absolutelyEvmTx && _evmTxAction != constants.EvmActionNone {
 					evmTxAction = _evmTxAction
 					evmTxSignature = _evmTxSignature
 					txValue = _txValue
@@ -199,22 +200,11 @@ func (m *Backend) getTransactionsInBlock(height int64) (blockInfo map[string]any
 			}
 
 			if wasmTxAction == constants.WasmActionNone {
-				switch msg.TypeUrl {
-				case "/cosmwasm.wasm.v1.MsgInstantiateContract":
+				_absolutelyWasmTx, _wasmTxAction, _wasmTxSignature := m.getWasmTransactionInfo(msg)
+				if _absolutelyWasmTx && _wasmTxAction != constants.WasmActionNone {
 					txType = txTypeWasm
-					wasmTxAction = constants.WasmActionCreate
-					wasmTxSignature = ""
-				case "/cosmwasm.wasm.v1.MsgExecuteContract":
-					txType = txTypeWasm
-					wasmTxAction = constants.WasmActionCall
-					if msgContent, errDecode := berpcutils.FromAnyToJsonMap(msg, m.clientCtx.Codec); errDecode == nil {
-						if execMsg, errConvert := berpcutils.TryConvertAnyStructToMap(msgContent["msg"]); errConvert == nil && len(execMsg) > 0 {
-							for k := range execMsg {
-								wasmTxSignature = k
-								break
-							}
-						}
-					}
+					wasmTxAction = _wasmTxAction
+					wasmTxSignature = _wasmTxSignature
 				}
 			}
 
@@ -463,7 +453,7 @@ func (m *Backend) GetTransactionByHash(hashStr string) (berpctypes.GenericBacken
 	return response, nil
 }
 
-func (m *Backend) getEvmTransactionInfo(txHash string) (evmTxAction constants.EvmAction, evmTxSignature string, txValue sdk.Coins, err error) {
+func (m *Backend) getEvmTransactionInfo(txHash string) (absolutelyEvmTx bool, evmTxAction constants.EvmAction, evmTxSignature string, txValue sdk.Coins, err error) {
 	evmTxAction = constants.EvmActionNone
 
 	// if the tx is an EVM tx, we need to get method signature
@@ -489,6 +479,8 @@ func (m *Backend) getEvmTransactionInfo(txHash string) (evmTxAction constants.Ev
 		err = fmt.Errorf("maybe not an EVM tx")
 		return
 	}
+
+	absolutelyEvmTx = true
 
 	var toStr, inputSigStr string
 	if to, ok := berpcutils.TryGetMapValueAsType[string](evmTx, "to"); ok && len(to) > 0 {
@@ -526,6 +518,30 @@ func (m *Backend) getEvmTransactionInfo(txHash string) (evmTxAction constants.Ev
 	} else {
 		evmTxAction = constants.EvmActionCall
 		evmTxSignature = inputSigStr
+	}
+
+	return
+}
+
+func (m *Backend) getWasmTransactionInfo(msgAny *codectypes.Any) (absolutelyWasmTx bool, wasmTxAction constants.WasmAction, wasmTxSignature string) {
+	switch msgAny.TypeUrl {
+	case "/cosmwasm.wasm.v1.MsgInstantiateContract":
+		absolutelyWasmTx = true
+		wasmTxAction = constants.WasmActionCreate
+		wasmTxSignature = ""
+	case "/cosmwasm.wasm.v1.MsgExecuteContract":
+		absolutelyWasmTx = true
+		wasmTxAction = constants.WasmActionCall
+		if msgContent, errDecode := berpcutils.FromAnyToJsonMap(msgAny, m.clientCtx.Codec); errDecode == nil {
+			if execMsg, errConvert := berpcutils.TryConvertAnyStructToMap(msgContent["msg"]); errConvert == nil && len(execMsg) > 0 {
+				for k := range execMsg {
+					wasmTxSignature = k
+					break
+				}
+			}
+		}
+	default:
+		absolutelyWasmTx = false
 	}
 
 	return

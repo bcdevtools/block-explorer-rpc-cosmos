@@ -92,8 +92,8 @@ func (m *Backend) GetBlockByNumber(height int64) (berpctypes.GenericBackendRespo
 				txHash = berpcutils.NormalizeTransactionHash(evmTxHash.String(), false)
 				txType = txTypeEvm
 
-				_evmTxAction, _evmTxSignature, _, errEvmTxInfo := m.getEvmTransactionInfo(txHash)
-				if errEvmTxInfo == nil && _evmTxAction != constants.EvmActionNone {
+				_absolutelyEvmTx, _evmTxAction, _evmTxSignature, _, errEvmTxInfo := m.getEvmTransactionInfo(txHash)
+				if errEvmTxInfo == nil && _absolutelyEvmTx && _evmTxAction != constants.EvmActionNone {
 					evmTxAction = _evmTxAction
 					evmTxSignature = _evmTxSignature
 				}
