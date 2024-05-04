@@ -176,46 +176,11 @@ func (m *Backend) getTransactionsInBlock(height int64) (blockInfo map[string]any
 				txHash = berpcutils.NormalizeTransactionHash(evmTxHash.String(), false)
 				txType = txTypeEvm
 
-				// if the tx is an EVM tx, we need to get method signature
-				txByHash, err := m.GetTransactionByHash(txHash)
-				if err == nil && txByHash != nil {
-					if evmTx, errConvert := berpcutils.TryConvertAnyStructToMap(txByHash["evmTx"]); errConvert == nil && len(evmTx) > 0 {
-						var toStr, inputSigStr string
-						if to, ok := berpcutils.TryGetMapValueAsType[string](evmTx, "to"); ok && len(to) > 0 {
-							toStr = to
-						}
-						if input, ok := berpcutils.TryGetMapValueAsType[string](evmTx, "input"); ok && len(input) > 0 {
-							if strings.HasPrefix(input, "0x") {
-								if len(input) >= 10 {
-									inputSigStr = input[:10]
-								}
-							} else {
-								if len(input) >= 8 {
-									inputSigStr = "0x" + input[:8]
-								}
-							}
-						}
-
-						if value, ok := berpcutils.TryGetMapValueAsType[string](evmTx, "value"); ok && len(value) > 0 {
-							if strings.HasPrefix(value, "0x") && len(value) > 2 {
-								if bi, ok := new(big.Int).SetString(value[2:], 16); ok && bi.Sign() > 0 {
-									if evmModuleParams, err := m.GetModuleParams("evm"); err == nil && len(evmModuleParams) > 0 {
-										if evmDenom, found := evmModuleParams["evm_denom"].(string); found && len(evmDenom) > 0 {
-											txValue = txValue.Add(sdk.NewCoin(evmDenom, sdk.NewIntFromBigInt(bi)))
-										}
-									}
-								}
-							}
-						}
-						if toStr == "" {
-							evmTxAction = constants.EvmActionCreate
-						} else if inputSigStr == "" {
-							evmTxAction = constants.EvmActionTransfer
-						} else {
-							evmTxAction = constants.EvmActionCall
-							evmTxSignature = inputSigStr
-						}
-					}
+				_evmTxAction, _evmTxSignature, _txValue, errEvmTxInfo := m.getEvmTransactionInfo(txHash)
+				if errEvmTxInfo == nil && _evmTxAction != constants.EvmActionNone {
+					evmTxAction = _evmTxAction
+					evmTxSignature = _evmTxSignature
+					txValue = _txValue
 				}
 			}
 		}
@@ -496,6 +461,74 @@ func (m *Backend) GetTransactionByHash(hashStr string) (berpctypes.GenericBacken
 	}
 
 	return response, nil
+}
+
+func (m *Backend) getEvmTransactionInfo(txHash string) (evmTxAction constants.EvmAction, evmTxSignature string, txValue sdk.Coins, err error) {
+	evmTxAction = constants.EvmActionNone
+
+	// if the tx is an EVM tx, we need to get method signature
+	txByHash, errGetTx := m.GetTransactionByHash(txHash)
+
+	if errGetTx != nil {
+		err = errGetTx
+		return
+	}
+
+	if txByHash == nil {
+		err = fmt.Errorf("not found")
+		return
+	}
+
+	evmTx, errConvert := berpcutils.TryConvertAnyStructToMap(txByHash["evmTx"])
+	if errConvert != nil {
+		err = errors.Wrap(errConvert, "maybe not an EVM tx")
+		return
+	}
+
+	if len(evmTx) == 0 {
+		err = fmt.Errorf("maybe not an EVM tx")
+		return
+	}
+
+	var toStr, inputSigStr string
+	if to, ok := berpcutils.TryGetMapValueAsType[string](evmTx, "to"); ok && len(to) > 0 {
+		toStr = to
+	}
+
+	if input, ok := berpcutils.TryGetMapValueAsType[string](evmTx, "input"); ok && len(input) > 0 {
+		if strings.HasPrefix(input, "0x") {
+			if len(input) >= 10 {
+				inputSigStr = input[:10]
+			}
+		} else {
+			if len(input) >= 8 {
+				inputSigStr = "0x" + input[:8]
+			}
+		}
+	}
+
+	if value, ok := berpcutils.TryGetMapValueAsType[string](evmTx, "value"); ok && len(value) > 0 {
+		if strings.HasPrefix(value, "0x") && len(value) > 2 {
+			if bi, ok := new(big.Int).SetString(value[2:], 16); ok && bi.Sign() > 0 {
+				if evmModuleParams, err := m.GetModuleParams("evm"); err == nil && len(evmModuleParams) > 0 {
+					if evmDenom, found := evmModuleParams["evm_denom"].(string); found && len(evmDenom) > 0 {
+						txValue = txValue.Add(sdk.NewCoin(evmDenom, sdk.NewIntFromBigInt(bi)))
+					}
+				}
+			}
+		}
+	}
+
+	if toStr == "" {
+		evmTxAction = constants.EvmActionCreate
+	} else if inputSigStr == "" {
+		evmTxAction = constants.EvmActionTransfer
+	} else {
+		evmTxAction = constants.EvmActionCall
+		evmTxSignature = inputSigStr
+	}
+
+	return
 }
 
 func (m *Backend) defaultMessageParser(msg sdk.Msg, msgIdx uint, tx *tx.Tx, txResponse *sdk.TxResponse) (res berpctypes.GenericBackendResponse, err error) {
