@@ -7,8 +7,9 @@ import (
 	berpctypes "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/types"
 	berpcutils "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/utils"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	tx "github.com/cosmos/cosmos-sdk/types/tx"
+	"github.com/cosmos/cosmos-sdk/types/tx"
 	"github.com/pkg/errors"
+	"github.com/tendermint/tendermint/libs/math"
 	tmtypes "github.com/tendermint/tendermint/types"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -28,6 +29,46 @@ func (m *Backend) GetLatestBlockNumber() (berpctypes.GenericBackendResponse, err
 	}, nil
 }
 
+func (m *Backend) GetRecentBlocks(pageNo, pageSize int) (berpctypes.GenericBackendResponse, error) {
+	pageNo = math.MaxInt(1, pageNo)
+	pageSize = math.MaxInt(1, pageSize)
+
+	statusInfo, err := m.clientCtx.Client.Status(m.ctx)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	latestBlockNumber := statusInfo.SyncInfo.LatestBlockHeight
+
+	startBlockNumber := latestBlockNumber - int64(pageNo)*int64(pageSize) + 1
+	startBlockNumber = math.MaxInt64(1, startBlockNumber)
+
+	endBlockNumber := startBlockNumber + int64(pageSize) - 1
+	endBlockNumber = math.MinInt64(latestBlockNumber, endBlockNumber)
+
+	blocksInfo := make([]berpctypes.GenericBackendResponse, 0)
+	for h := startBlockNumber; h <= endBlockNumber; h++ {
+		resBlock, err := m.queryClient.ServiceClient.GetBlockWithTxs(m.ctx, &tx.GetBlockWithTxsRequest{
+			Height: h,
+		})
+		if err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+		if resBlock == nil {
+			return nil, status.Error(codes.NotFound, fmt.Sprintf("block not found %d", h))
+		}
+		blocksInfo = append(blocksInfo, m.getBasicBlockInformation(resBlock))
+	}
+
+	return berpctypes.GenericBackendResponse{
+		"latestBlock":             latestBlockNumber,
+		"latestBlockTimeEpochUTC": statusInfo.SyncInfo.LatestBlockTime.UTC().Unix(),
+		"pageNumber":              pageNo,
+		"pageSize":                pageSize,
+		"blocks":                  blocksInfo,
+	}, nil
+}
+
 func (m *Backend) GetBlockByNumber(height int64) (berpctypes.GenericBackendResponse, error) {
 	resBlock, err := m.queryClient.ServiceClient.GetBlockWithTxs(m.ctx, &tx.GetBlockWithTxsRequest{
 		Height: height,
@@ -36,32 +77,11 @@ func (m *Backend) GetBlockByNumber(height int64) (berpctypes.GenericBackendRespo
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	if resBlock == nil {
-		return nil, status.Error(codes.NotFound, "block not found")
+		return nil, status.Error(codes.NotFound, fmt.Sprintf("block not found %d", height))
 	}
 
-	block := resBlock.Block
-
-	response := berpctypes.GenericBackendResponse{
-		"height":       block.Header.Height,
-		"hash":         strings.ToUpper(hex.EncodeToString(resBlock.BlockId.Hash)),
-		"timeEpochUTC": block.Header.Time.UTC().Unix(),
-	}
-
-	proposerConsAddr := sdk.ConsAddress(block.Header.GetProposerAddress()).String()
-	var proposerMoniker string
-	if stakingValidators, err := m.stakingValidatorsCache.GetValidators(); err == nil {
-		for _, stakingValidator := range stakingValidators {
-			if stakingValidator.consAddr == proposerConsAddr {
-				proposerMoniker = stakingValidator.validator.Description.Moniker
-				break
-			}
-		}
-	}
-
-	response["proposer"] = berpctypes.GenericBackendResponse{
-		"consensusAddress": proposerConsAddr,
-		"moniker":          proposerMoniker,
-	}
+	response := m.getBasicBlockInformation(resBlock)
+	delete(response, "txsCount") // maintains legacy format
 
 	sdkCtx := sdk.NewContext(nil, resBlock.Block.Header, false, nil).
 		WithBlockHeight(resBlock.Block.Header.Height).
@@ -185,4 +205,32 @@ func (m *Backend) GetBlockByNumber(height int64) (berpctypes.GenericBackendRespo
 	response["txs"] = txsInfo
 
 	return response, nil
+}
+
+func (m *Backend) getBasicBlockInformation(resBlock *tx.GetBlockWithTxsResponse) berpctypes.GenericBackendResponse {
+	block := resBlock.Block
+	result := berpctypes.GenericBackendResponse{
+		"height":       block.Header.Height,
+		"hash":         strings.ToUpper(hex.EncodeToString(resBlock.BlockId.Hash)),
+		"timeEpochUTC": block.Header.Time.UTC().Unix(),
+		"txsCount":     len(resBlock.Txs),
+	}
+
+	proposerConsAddr := sdk.ConsAddress(block.Header.GetProposerAddress()).String()
+	var proposerMoniker string
+	if stakingValidators, err := m.stakingValidatorsCache.GetValidators(); err == nil {
+		for _, stakingValidator := range stakingValidators {
+			if stakingValidator.consAddr == proposerConsAddr {
+				proposerMoniker = stakingValidator.validator.Description.Moniker
+				break
+			}
+		}
+	}
+
+	result["proposer"] = berpctypes.GenericBackendResponse{
+		"consensusAddress": proposerConsAddr,
+		"moniker":          proposerMoniker,
+	}
+
+	return result
 }

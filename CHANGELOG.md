@@ -56,6 +56,12 @@ Templates for Unreleased:
 
 ## Unreleased
 
+## v1.2.0 - 2024-05-06
+
+### Features
+
+- (rpc) [#20](https://github.com/bcdevtools/block-explorer-rpc-cosmos/pull/20) Add new API `be_getRecentBlocks` to fetch recent blocks
+
 ### Improvements
 
 - (rpc) [#18](https://github.com/bcdevtools/block-explorer-rpc-cosmos/pull/18) `be_getBlockByNumber` returns proposer
