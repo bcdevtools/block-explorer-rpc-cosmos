@@ -31,6 +31,9 @@ type BackendI interface {
 	// GetLatestBlockNumber returns the latest block number, along with the epoch UTC seconds.
 	GetLatestBlockNumber() (berpctypes.GenericBackendResponse, error)
 
+	// GetRecentBlocks returns the recent blocks, paginated.
+	GetRecentBlocks(pageNo, pageSize int) (berpctypes.GenericBackendResponse, error)
+
 	// GetBlockByNumber returns a block by its height.
 	GetBlockByNumber(height int64) (berpctypes.GenericBackendResponse, error)
 
