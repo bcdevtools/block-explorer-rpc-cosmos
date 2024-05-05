@@ -33,6 +33,11 @@ func (m *Backend) GetRecentBlocks(pageNo, pageSize int) (berpctypes.GenericBacke
 	pageNo = math.MaxInt(1, pageNo)
 	pageSize = math.MaxInt(1, pageSize)
 
+	const maxPageSize = 100
+	if pageSize > maxPageSize {
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("page size exceeds maximum allowed value %d", maxPageSize))
+	}
+
 	statusInfo, err := m.clientCtx.Client.Status(m.ctx)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
