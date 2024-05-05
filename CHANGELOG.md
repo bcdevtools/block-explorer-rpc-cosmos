@@ -56,7 +56,7 @@ Templates for Unreleased:
 
 ## Unreleased
 
-## v1.2.0 - 2024-05-06
+## v1.2.1 - 2024-05-06
 
 ### Features
 
@@ -66,6 +66,10 @@ Templates for Unreleased:
 
 - (rpc) [#18](https://github.com/bcdevtools/block-explorer-rpc-cosmos/pull/18) `be_getBlockByNumber` returns proposer
 - (rpc) [#19](https://github.com/bcdevtools/block-explorer-rpc-cosmos/pull/19) `be_getChainInfo` returns Be-RPC version
+
+### Bug Fixes
+
+- (rpc) [#21](https://github.com/bcdevtools/block-explorer-rpc-cosmos/pull/21) Limit page size API `be_getRecentBlocks`
 
 ## v1.1.7 - 2024-05-05
 
