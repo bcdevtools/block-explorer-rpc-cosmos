@@ -8,6 +8,7 @@ import (
 	govv1types "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
 	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
+	ibctransfertypes "github.com/cosmos/ibc-go/v6/modules/apps/transfer/types"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -141,6 +142,14 @@ func (m *Backend) GetModuleParams(moduleName string) (berpctypes.GenericBackendR
 		}
 
 		params = authParams.Params
+	case "ibc-transfer":
+		ibcTransferParams, errFetch := m.queryClient.IbcTransferQueryClient.Params(m.ctx, &ibctransfertypes.QueryParamsRequest{})
+		if errFetch != nil {
+			err = errors.Wrap(errFetch, "failed to get ibc-transfer params")
+			break
+		}
+
+		params = ibcTransferParams.Params
 	default:
 		err = errors.Errorf("not yet support module %s", moduleName)
 	}

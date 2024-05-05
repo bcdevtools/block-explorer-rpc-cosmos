@@ -8,6 +8,7 @@ import (
 	govv1types "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
 	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
+	ibctransfertypes "github.com/cosmos/ibc-go/v6/modules/apps/transfer/types"
 
 	"github.com/cosmos/cosmos-sdk/client"
 )
@@ -23,6 +24,7 @@ type QueryClient struct {
 	GovV1QueryClient        govv1types.QueryClient
 	MintQueryClient         minttypes.QueryClient
 	AuthQueryClient         authtypes.QueryClient
+	IbcTransferQueryClient  ibctransfertypes.QueryClient
 }
 
 // NewQueryClient creates a new gRPC query client
@@ -35,5 +37,6 @@ func NewQueryClient(clientCtx client.Context) *QueryClient {
 		GovV1QueryClient:        govv1types.NewQueryClient(clientCtx),
 		MintQueryClient:         minttypes.NewQueryClient(clientCtx),
 		AuthQueryClient:         authtypes.NewQueryClient(clientCtx),
+		IbcTransferQueryClient:  ibctransfertypes.NewQueryClient(clientCtx),
 	}
 }
