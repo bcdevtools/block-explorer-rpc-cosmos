@@ -59,6 +59,7 @@ Templates for Unreleased:
 ### Improvements
 
 - (rpc) [#18](https://github.com/bcdevtools/block-explorer-rpc-cosmos/pull/18) `be_getBlockByNumber` returns proposer
+- (rpc) [#19](https://github.com/bcdevtools/block-explorer-rpc-cosmos/pull/19) `be_getChainInfo` returns Be-RPC version
 
 ## v1.1.7 - 2024-05-05
 
