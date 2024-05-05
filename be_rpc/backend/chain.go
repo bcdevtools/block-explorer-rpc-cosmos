@@ -92,12 +92,39 @@ func (m *Backend) GetModuleParams(moduleName string) (berpctypes.GenericBackendR
 			params = distributionParams.Params
 		}
 	case "gov":
-		govParams, errFetch := m.queryClient.GovV1QueryClient.Params(m.ctx, &govv1types.QueryParamsRequest{})
+		govParams := &govv1types.QueryParamsResponse{}
+
+		votingParams, errFetch := m.queryClient.GovV1QueryClient.Params(m.ctx, &govv1types.QueryParamsRequest{
+			ParamsType: govv1types.ParamVoting,
+		})
 		if errFetch != nil {
-			err = errors.Wrap(errFetch, "failed to get gov params")
+			err = errors.Wrap(errFetch, "failed to get gov voting params")
+			break
 		} else {
-			params = govParams
+			govParams.VotingParams = votingParams.VotingParams
 		}
+
+		tallyParams, errFetch := m.queryClient.GovV1QueryClient.Params(m.ctx, &govv1types.QueryParamsRequest{
+			ParamsType: govv1types.ParamTallying,
+		})
+		if errFetch != nil {
+			err = errors.Wrap(errFetch, "failed to get gov tallying params")
+			break
+		} else {
+			govParams.TallyParams = tallyParams.TallyParams
+		}
+
+		depositParams, errFetch := m.queryClient.GovV1QueryClient.Params(m.ctx, &govv1types.QueryParamsRequest{
+			ParamsType: govv1types.ParamDeposit,
+		})
+		if errFetch != nil {
+			err = errors.Wrap(errFetch, "failed to get gov deposit params")
+			break
+		} else {
+			govParams.DepositParams = depositParams.DepositParams
+		}
+
+		params = govParams
 	case "mint":
 		mintParams, errFetch := m.queryClient.MintQueryClient.Params(m.ctx, &minttypes.QueryParamsRequest{})
 		if errFetch != nil {

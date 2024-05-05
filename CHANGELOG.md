@@ -56,6 +56,10 @@ Templates for Unreleased:
 
 ## Unreleased
 
+### Bug Fixes
+
+- (rpc) [#16](https://github.com/bcdevtools/block-explorer-rpc-cosmos/pull/16) Fix query gov module params
+
 ## v1.1.6 - 2024-05-05
 
 ### Improvements
