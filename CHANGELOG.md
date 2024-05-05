@@ -56,6 +56,12 @@ Templates for Unreleased:
 
 ## Unreleased
 
+## v1.1.7 - 2024-05-05
+
+### Improvements
+
+- (rpc) [#17](https://github.com/bcdevtools/block-explorer-rpc-cosmos/pull/17) Add query module params for `auth` and `ibc-transfer` module
+
 ### Bug Fixes
 
 - (rpc) [#16](https://github.com/bcdevtools/block-explorer-rpc-cosmos/pull/16) Fix query gov module params
