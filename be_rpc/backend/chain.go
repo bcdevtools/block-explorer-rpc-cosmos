@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/constants"
 	berpctypes "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
@@ -52,6 +53,9 @@ func (m *Backend) GetChainInfo() (berpctypes.GenericBackendResponse, error) {
 			"cons": m.bech32Cfg.GetBech32ConsensusAddrPrefix(),
 		},
 		"denoms": denoms,
+		"version": map[string]string{
+			"be-rpc-cosmos": constants.BlockExplorerRpcCosmosVersion,
+		},
 	}, nil
 }
 
