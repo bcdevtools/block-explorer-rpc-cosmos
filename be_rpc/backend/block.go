@@ -47,6 +47,22 @@ func (m *Backend) GetBlockByNumber(height int64) (berpctypes.GenericBackendRespo
 		"timeEpochUTC": block.Header.Time.UTC().Unix(),
 	}
 
+	proposerConsAddr := sdk.ConsAddress(block.Header.GetProposerAddress()).String()
+	var proposerMoniker string
+	if stakingValidators, err := m.stakingValidatorsCache.GetValidators(); err == nil {
+		for _, stakingValidator := range stakingValidators {
+			if stakingValidator.consAddr == proposerConsAddr {
+				proposerMoniker = stakingValidator.validator.Description.Moniker
+				break
+			}
+		}
+	}
+
+	response["proposer"] = berpctypes.GenericBackendResponse{
+		"consensusAddress": proposerConsAddr,
+		"moniker":          proposerMoniker,
+	}
+
 	sdkCtx := sdk.NewContext(nil, resBlock.Block.Header, false, nil).
 		WithBlockHeight(resBlock.Block.Header.Height).
 		WithBlockTime(resBlock.Block.Header.Time)
