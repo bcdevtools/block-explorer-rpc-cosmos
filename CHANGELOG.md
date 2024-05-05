@@ -56,6 +56,10 @@ Templates for Unreleased:
 
 ## Unreleased
 
+### Improvements
+
+- (rpc) [#18](https://github.com/bcdevtools/block-explorer-rpc-cosmos/pull/18) `be_getBlockByNumber` returns proposer
+
 ## v1.1.7 - 2024-05-05
 
 ### Improvements

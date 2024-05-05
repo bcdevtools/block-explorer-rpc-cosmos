@@ -155,10 +155,10 @@ func (m *Backend) GetValidatorAccount(consOrValAddr string) (berpctypes.GenericB
 	}
 
 	var valAddr, consAddr string
-	for _, validator := range stakingValidators {
-		if validator.consAddr == consOrValAddr || validator.validator.OperatorAddress == consOrValAddr {
-			valAddr = validator.validator.OperatorAddress
-			consAddr = validator.consAddr
+	for _, stakingValidator := range stakingValidators {
+		if stakingValidator.consAddr == consOrValAddr || stakingValidator.validator.OperatorAddress == consOrValAddr {
+			valAddr = stakingValidator.validator.OperatorAddress
+			consAddr = stakingValidator.consAddr
 			break
 		}
 	}
