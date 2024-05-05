@@ -2,6 +2,7 @@ package backend
 
 import (
 	berpctypes "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/types"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	disttypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
 	govv1types "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
@@ -132,6 +133,13 @@ func (m *Backend) GetModuleParams(moduleName string) (berpctypes.GenericBackendR
 		} else {
 			params = mintParams.Params
 		}
+	case "auth":
+		authParams, errFetch := m.queryClient.AuthQueryClient.Params(m.ctx, &authtypes.QueryParamsRequest{})
+		if errFetch != nil {
+			err = errors.Wrap(errFetch, "failed to get auth params")
+			break
+		}
+		params = authParams.Params
 	default:
 		err = errors.Errorf("not yet support module %s", moduleName)
 	}
