@@ -94,6 +94,14 @@ func (m *Backend) GetValidators() (berpctypes.GenericBackendResponse, error) {
 		return stakingValidators[i].validator.Tokens.GT(stakingValidators[j].validator.Tokens)
 	})
 
+	stakingParams, err := m.queryClient.StakingQueryClient.Params(m.ctx, &stakingtypes.QueryParamsRequest{})
+	if err != nil {
+		return nil, status.Error(codes.Internal, errors.Wrap(err, "failed to get staking params").Error())
+	}
+	if uint32(len(stakingValidators)) > stakingParams.Params.MaxValidators {
+		stakingValidators = stakingValidators[:stakingParams.Params.MaxValidators]
+	}
+
 	res := make(berpctypes.GenericBackendResponse)
 
 	var bondTokenDecimals int
