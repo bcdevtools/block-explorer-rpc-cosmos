@@ -6,7 +6,6 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
-	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/codes"
@@ -154,52 +153,44 @@ func (m *Backend) GetValidatorAccount(consOrValAddr string) (berpctypes.GenericB
 		return nil, status.Error(codes.NotFound, "validator could not be found")
 	}
 
-	var valAddr, consAddr string
+	var validator cachedValidator
+
 	for _, stakingValidator := range stakingValidators {
 		if stakingValidator.consAddr == consOrValAddr || stakingValidator.validator.OperatorAddress == consOrValAddr {
-			valAddr = stakingValidator.validator.OperatorAddress
-			consAddr = stakingValidator.consAddr
+			validator = stakingValidator
 			break
 		}
 	}
-
-	if valAddr == "" || consAddr == "" {
+	if validator.consAddr == "" {
 		return nil, status.Error(codes.NotFound, "validator could not be found")
 	}
 
 	res["address"] = berpctypes.GenericBackendResponse{
-		"validatorAddress": valAddr,
-		"consensusAddress": consAddr,
-	}
-
-	resValInfo, err := m.queryClient.StakingQueryClient.Validator(m.ctx, &stakingtypes.QueryValidatorRequest{
-		ValidatorAddr: valAddr,
-	})
-	if err != nil {
-		return nil, status.Error(codes.Internal, errors.Wrap(err, "failed to get validator info").Error())
+		"validatorAddress": validator.validator.OperatorAddress,
+		"consensusAddress": validator.consAddr,
 	}
 
 	validatorInfo := berpctypes.GenericBackendResponse{
-		"jailed":          resValInfo.Validator.Jailed,
-		"status":          resValInfo.Validator.Status.String(),
-		"tokens":          resValInfo.Validator.Tokens.String(),
-		"delegatorShares": resValInfo.Validator.DelegatorShares.String(),
+		"jailed":          validator.validator.Jailed,
+		"status":          validator.validator.Status.String(),
+		"tokens":          validator.validator.Tokens.String(),
+		"delegatorShares": validator.validator.DelegatorShares.String(),
 		"description": berpctypes.GenericBackendResponse{
-			"moniker":         resValInfo.Validator.Description.Moniker,
-			"identity":        resValInfo.Validator.Description.Identity,
-			"website":         resValInfo.Validator.Description.Website,
-			"securityContact": resValInfo.Validator.Description.SecurityContact,
-			"details":         resValInfo.Validator.Description.Details,
+			"moniker":         validator.validator.Description.Moniker,
+			"identity":        validator.validator.Description.Identity,
+			"website":         validator.validator.Description.Website,
+			"securityContact": validator.validator.Description.SecurityContact,
+			"details":         validator.validator.Description.Details,
 		},
-		"unbondingHeight":   resValInfo.Validator.UnbondingHeight,
-		"unbondingTime":     resValInfo.Validator.UnbondingTime,
-		"commission":        resValInfo.Validator.Commission,
-		"minSelfDelegation": resValInfo.Validator.MinSelfDelegation.String(),
+		"unbondingHeight":   validator.validator.UnbondingHeight,
+		"unbondingTime":     validator.validator.UnbondingTime,
+		"commission":        validator.validator.Commission,
+		"minSelfDelegation": validator.validator.MinSelfDelegation.String(),
 	}
 
 	res["validator"] = validatorInfo
 
-	consensusPubKeyMap, err := berpcutils.FromAnyToJsonMap(resValInfo.Validator.ConsensusPubkey, m.clientCtx.Codec)
+	consensusPubKeyMap, err := berpcutils.FromAnyToJsonMap(validator.validator.ConsensusPubkey, m.clientCtx.Codec)
 	if err == nil {
 		validatorInfo["consensusPubkey"] = consensusPubKeyMap
 	}
@@ -209,13 +200,13 @@ func (m *Backend) GetValidatorAccount(consOrValAddr string) (berpctypes.GenericB
 		return nil, status.Error(codes.Internal, errors.Wrap(err, "failed to get validators").Error())
 	}
 	for _, val := range tmVals {
-		if sdk.ConsAddress(val.Address).String() == consAddr {
+		if sdk.ConsAddress(val.Address).String() == validator.consAddr {
 			validatorInfo["votingPower"] = val.VotingPower
 			break
 		}
 	}
 
-	stakingInfo, err := m.GetStakingInfo(valAddr)
+	stakingInfo, err := m.GetStakingInfo(validator.validator.OperatorAddress)
 	if err != nil {
 		return nil, err
 	}
