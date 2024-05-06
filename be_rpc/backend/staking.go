@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"sort"
 	"strings"
 )
 
@@ -89,15 +90,29 @@ func (m *Backend) GetValidators() (berpctypes.GenericBackendResponse, error) {
 		return nil, status.Error(codes.Internal, errors.Wrap(err, "failed to get staking validators").Error())
 	}
 
+	sort.Slice(stakingValidators, func(i, j int) bool {
+		return stakingValidators[i].validator.Tokens.GT(stakingValidators[j].validator.Tokens)
+	})
+
 	res := make(berpctypes.GenericBackendResponse)
+
+	var bondTokenDecimals int
+	if m.externalServices.ChainType == berpctypes.ChainTypeEvm {
+		bondTokenDecimals = 18
+	} else {
+		bondTokenDecimals = 6
+	}
 
 	for _, stakingValidator := range stakingValidators {
 		consAddr := stakingValidator.consAddr
 		valInfo := map[string]any{
-			"consAddress": consAddr,
-			"valAddress":  stakingValidator.validator.OperatorAddress,
-			"pubKeyType":  "",
-			"votingPower": -1,
+			"consAddress":    consAddr,
+			"valAddress":     stakingValidator.validator.OperatorAddress,
+			"pubKeyType":     "",
+			"votingPower":    -1,
+			"tokens":         stakingValidator.validator.Tokens,
+			"tokensDecimals": bondTokenDecimals,
+			"commission":     stakingValidator.validator.Commission.Rate,
 		}
 
 		for _, tmValidator := range tmValidators {
