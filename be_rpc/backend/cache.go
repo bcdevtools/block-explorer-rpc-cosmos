@@ -215,6 +215,8 @@ func (vc *stakingValidatorsCache) reloadCacheWithoutLock(height int64) error {
 		return errStakingVals
 	}
 
+	cachedValidators := make([]cachedValidator, 0)
+
 	for _, val := range stakingVals.Validators {
 		consAddr, success := berpcutils.FromAnyPubKeyToConsensusAddress(val.ConsensusPubkey, vc.codec)
 		if !success {
@@ -222,12 +224,13 @@ func (vc *stakingValidatorsCache) reloadCacheWithoutLock(height int64) error {
 		}
 
 		consAddrStr := consAddr.String()
-		vc.validators = append(vc.validators, cachedValidator{
+		cachedValidators = append(cachedValidators, cachedValidator{
 			consAddr:  consAddrStr,
 			validator: val,
 		})
 	}
 
+	vc.validators = cachedValidators
 	vc.cacheController.UpdateExpirationAnchor(height + validatorsCacheExpiration)
 
 	return nil

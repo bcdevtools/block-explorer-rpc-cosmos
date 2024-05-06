@@ -56,6 +56,12 @@ Templates for Unreleased:
 
 ## Unreleased
 
+## v1.2.3 - 2024-05-06
+
+### Bug Fixes
+
+- (rpc) [#23](https://github.com/bcdevtools/block-explorer-rpc-cosmos/pull/23) Fix cache staking validators not reloaded correctly
+
 ## v1.2.2 - 2024-05-06
 
 ### Improvements
