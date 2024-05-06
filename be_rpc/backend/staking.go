@@ -98,7 +98,7 @@ func (m *Backend) GetValidators() (berpctypes.GenericBackendResponse, error) {
 	if err != nil {
 		return nil, status.Error(codes.Internal, errors.Wrap(err, "failed to get staking params").Error())
 	}
-	if uint32(len(stakingValidators)) > stakingParams.Params.MaxValidators {
+	if stakingParams.Params.MaxValidators > 0 && uint32(len(stakingValidators)) > stakingParams.Params.MaxValidators {
 		stakingValidators = stakingValidators[:stakingParams.Params.MaxValidators]
 	}
 
