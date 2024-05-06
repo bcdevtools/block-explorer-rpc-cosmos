@@ -56,6 +56,12 @@ Templates for Unreleased:
 
 ## Unreleased
 
+## v1.2.2 - 2024-05-06
+
+### Improvements
+
+- (rpc) [#22](https://github.com/bcdevtools/block-explorer-rpc-cosmos/pull/22) `be_getValidators` returns more necessary information
+
 ## v1.2.1 - 2024-05-06
 
 ### Features
