@@ -90,10 +90,10 @@ func (m *Backend) GetValidators() (berpctypes.GenericBackendResponse, error) {
 		return nil, status.Error(codes.Internal, errors.Wrap(err, "failed to get staking validators").Error())
 	}
 
+	// take only active set
 	sort.Slice(stakingValidators, func(i, j int) bool {
 		return stakingValidators[i].validator.Tokens.GT(stakingValidators[j].validator.Tokens)
 	})
-
 	stakingParams, err := m.queryClient.StakingQueryClient.Params(m.ctx, &stakingtypes.QueryParamsRequest{})
 	if err != nil {
 		return nil, status.Error(codes.Internal, errors.Wrap(err, "failed to get staking params").Error())
@@ -102,6 +102,7 @@ func (m *Backend) GetValidators() (berpctypes.GenericBackendResponse, error) {
 		stakingValidators = stakingValidators[:stakingParams.Params.MaxValidators]
 	}
 
+	// build response
 	res := make(berpctypes.GenericBackendResponse)
 
 	var bondTokenDecimals int
@@ -116,6 +117,7 @@ func (m *Backend) GetValidators() (berpctypes.GenericBackendResponse, error) {
 		valInfo := map[string]any{
 			"consAddress":    consAddr,
 			"valAddress":     stakingValidator.validator.OperatorAddress,
+			"moniker":        stakingValidator.validator.Description.Moniker,
 			"pubKeyType":     "",
 			"votingPower":    -1,
 			"tokens":         stakingValidator.validator.Tokens,
