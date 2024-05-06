@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"sort"
 	"strings"
 )
 
@@ -89,15 +90,39 @@ func (m *Backend) GetValidators() (berpctypes.GenericBackendResponse, error) {
 		return nil, status.Error(codes.Internal, errors.Wrap(err, "failed to get staking validators").Error())
 	}
 
+	// take only active set
+	sort.Slice(stakingValidators, func(i, j int) bool {
+		return stakingValidators[i].validator.Tokens.GT(stakingValidators[j].validator.Tokens)
+	})
+	stakingParams, err := m.queryClient.StakingQueryClient.Params(m.ctx, &stakingtypes.QueryParamsRequest{})
+	if err != nil {
+		return nil, status.Error(codes.Internal, errors.Wrap(err, "failed to get staking params").Error())
+	}
+	if uint32(len(stakingValidators)) > stakingParams.Params.MaxValidators {
+		stakingValidators = stakingValidators[:stakingParams.Params.MaxValidators]
+	}
+
+	// build response
 	res := make(berpctypes.GenericBackendResponse)
+
+	var bondTokenDecimals int
+	if m.externalServices.ChainType == berpctypes.ChainTypeEvm {
+		bondTokenDecimals = 18
+	} else {
+		bondTokenDecimals = 6
+	}
 
 	for _, stakingValidator := range stakingValidators {
 		consAddr := stakingValidator.consAddr
 		valInfo := map[string]any{
-			"consAddress": consAddr,
-			"valAddress":  stakingValidator.validator.OperatorAddress,
-			"pubKeyType":  "",
-			"votingPower": -1,
+			"consAddress":    consAddr,
+			"valAddress":     stakingValidator.validator.OperatorAddress,
+			"moniker":        stakingValidator.validator.Description.Moniker,
+			"pubKeyType":     "",
+			"votingPower":    -1,
+			"tokens":         stakingValidator.validator.Tokens,
+			"tokensDecimals": bondTokenDecimals,
+			"commission":     stakingValidator.validator.Commission.Rate,
 		}
 
 		for _, tmValidator := range tmValidators {

@@ -1,5 +1,5 @@
 package constants
 
 const (
-	BlockExplorerRpcCosmosVersion = "1.2.0"
+	BlockExplorerRpcCosmosVersion = "1.2.2"
 )
