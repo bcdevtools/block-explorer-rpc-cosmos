@@ -56,6 +56,12 @@ Templates for Unreleased:
 
 ## Unreleased
 
+## v1.2.4 - 2024-06-03
+
+### Improvements
+
+- (backend) [#24](https://github.com/bcdevtools/block-explorer-rpc-cosmos/pull/24) Expose method `GetBankDenomsMetadata`
+
 ## v1.2.3 - 2024-05-06
 
 ### Bug Fixes
