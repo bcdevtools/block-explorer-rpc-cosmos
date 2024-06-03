@@ -565,7 +565,7 @@ func (m *Backend) defaultMessageParser(msg sdk.Msg, msgIdx uint, tx *tx.Tx, txRe
 		berpctypes.NewFriendlyResponseContentBuilder().
 			WriteAddress(msg.FromAddress).
 			WriteText(" transfers ").
-			WriteCoins(msg.Amount, m.getBankDenomsMetadata(msg.Amount)).
+			WriteCoins(msg.Amount, m.GetBankDenomsMetadata(msg.Amount)).
 			WriteText(" to ").
 			WriteAddress(msg.ToAddress).
 			BuildIntoResponse(res)
@@ -601,7 +601,7 @@ func (m *Backend) defaultMessageParser(msg sdk.Msg, msgIdx uint, tx *tx.Tx, txRe
 			if i > 0 {
 				rb.WriteText(", ")
 			}
-			rb.WriteCoins(output.Coins, m.getBankDenomsMetadata(allCoins)).
+			rb.WriteCoins(output.Coins, m.GetBankDenomsMetadata(allCoins)).
 				WriteText(" to ").
 				WriteAddress(output.Address)
 		}
@@ -678,7 +678,7 @@ func (m *Backend) defaultMessageParser(msg sdk.Msg, msgIdx uint, tx *tx.Tx, txRe
 		berpctypes.NewFriendlyResponseContentBuilder().
 			WriteAddress(msg.Depositor).
 			WriteText(" funds community pool with ").
-			WriteCoins(msg.Amount, m.getBankDenomsMetadata(msg.Amount)).
+			WriteCoins(msg.Amount, m.GetBankDenomsMetadata(msg.Amount)).
 			BuildIntoResponse(res)
 
 		return
@@ -711,7 +711,7 @@ func (m *Backend) defaultMessageParser(msg sdk.Msg, msgIdx uint, tx *tx.Tx, txRe
 			WriteText(" submits proposal of message types [").
 			WriteText(strings.Join(messageTypes, ", ")).
 			WriteText("] with initial deposit ").
-			WriteCoins(msg.InitialDeposit, m.getBankDenomsMetadata(msg.InitialDeposit)).
+			WriteCoins(msg.InitialDeposit, m.GetBankDenomsMetadata(msg.InitialDeposit)).
 			BuildIntoResponse(res)
 
 		return
@@ -727,7 +727,7 @@ func (m *Backend) defaultMessageParser(msg sdk.Msg, msgIdx uint, tx *tx.Tx, txRe
 			WriteText(" submits proposal of message types [").
 			WriteText(msg.Content.TypeUrl).
 			WriteText("] with initial deposit ").
-			WriteCoins(msg.InitialDeposit, m.getBankDenomsMetadata(msg.InitialDeposit)).
+			WriteCoins(msg.InitialDeposit, m.GetBankDenomsMetadata(msg.InitialDeposit)).
 			BuildIntoResponse(res)
 
 		return
@@ -741,7 +741,7 @@ func (m *Backend) defaultMessageParser(msg sdk.Msg, msgIdx uint, tx *tx.Tx, txRe
 		berpctypes.NewFriendlyResponseContentBuilder().
 			WriteAddress(msg.Depositor).
 			WriteText(" deposits ").
-			WriteCoins(msg.Amount, m.getBankDenomsMetadata(msg.Amount)).
+			WriteCoins(msg.Amount, m.GetBankDenomsMetadata(msg.Amount)).
 			WriteText(" to proposal ").
 			WriteText(fmt.Sprintf("%d", msg.ProposalId)).
 			BuildIntoResponse(res)
@@ -757,7 +757,7 @@ func (m *Backend) defaultMessageParser(msg sdk.Msg, msgIdx uint, tx *tx.Tx, txRe
 		berpctypes.NewFriendlyResponseContentBuilder().
 			WriteAddress(msg.Depositor).
 			WriteText(" deposits ").
-			WriteCoins(msg.Amount, m.getBankDenomsMetadata(msg.Amount)).
+			WriteCoins(msg.Amount, m.GetBankDenomsMetadata(msg.Amount)).
 			WriteText(" to proposal ").
 			WriteText(fmt.Sprintf("%d", msg.ProposalId)).
 			BuildIntoResponse(res)
@@ -917,7 +917,7 @@ func (m *Backend) defaultMessageParser(msg sdk.Msg, msgIdx uint, tx *tx.Tx, txRe
 		berpctypes.NewFriendlyResponseContentBuilder().
 			WriteAddress(msg.Sender).
 			WriteText(" transfers ").
-			WriteCoins(sdk.Coins{msg.Token}, m.getBankDenomsMetadata(sdk.Coins{msg.Token})).
+			WriteCoins(sdk.Coins{msg.Token}, m.GetBankDenomsMetadata(sdk.Coins{msg.Token})).
 			WriteText(" to ").
 			WriteAddress(msg.Receiver).
 			WriteText(" through IBC via ").
@@ -1189,7 +1189,7 @@ func (m *Backend) defaultMessageParser(msg sdk.Msg, msgIdx uint, tx *tx.Tx, txRe
 			WriteText(" creates validator ").
 			WriteAddress(msg.ValidatorAddress).
 			WriteText(" with delegation ").
-			WriteCoins(sdk.Coins{msg.Value}, m.getBankDenomsMetadata(sdk.Coins{msg.Value})).
+			WriteCoins(sdk.Coins{msg.Value}, m.GetBankDenomsMetadata(sdk.Coins{msg.Value})).
 			BuildIntoResponse(res)
 
 		return
@@ -1240,7 +1240,7 @@ func (m *Backend) defaultMessageParser(msg sdk.Msg, msgIdx uint, tx *tx.Tx, txRe
 		berpctypes.NewFriendlyResponseContentBuilder().
 			WriteAddress(msg.DelegatorAddress).
 			WriteText(" delegates ").
-			WriteCoins(sdk.Coins{msg.Amount}, m.getBankDenomsMetadata(sdk.Coins{msg.Amount})).
+			WriteCoins(sdk.Coins{msg.Amount}, m.GetBankDenomsMetadata(sdk.Coins{msg.Amount})).
 			WriteText(" to ").
 			WriteAddress(msg.ValidatorAddress).
 			BuildIntoResponse(res)
@@ -1257,7 +1257,7 @@ func (m *Backend) defaultMessageParser(msg sdk.Msg, msgIdx uint, tx *tx.Tx, txRe
 		berpctypes.NewFriendlyResponseContentBuilder().
 			WriteAddress(msg.DelegatorAddress).
 			WriteText(" re-delegates ").
-			WriteCoins(sdk.Coins{msg.Amount}, m.getBankDenomsMetadata(sdk.Coins{msg.Amount})).
+			WriteCoins(sdk.Coins{msg.Amount}, m.GetBankDenomsMetadata(sdk.Coins{msg.Amount})).
 			WriteText(" from ").
 			WriteAddress(msg.ValidatorSrcAddress).
 			WriteText(" to ").
@@ -1275,7 +1275,7 @@ func (m *Backend) defaultMessageParser(msg sdk.Msg, msgIdx uint, tx *tx.Tx, txRe
 		berpctypes.NewFriendlyResponseContentBuilder().
 			WriteAddress(msg.DelegatorAddress).
 			WriteText(" un-delegates ").
-			WriteCoins(sdk.Coins{msg.Amount}, m.getBankDenomsMetadata(sdk.Coins{msg.Amount})).
+			WriteCoins(sdk.Coins{msg.Amount}, m.GetBankDenomsMetadata(sdk.Coins{msg.Amount})).
 			WriteText(" from ").
 			WriteAddress(msg.ValidatorAddress).
 			BuildIntoResponse(res)
@@ -1381,43 +1381,6 @@ func (m *Backend) defaultMessageParser(msg sdk.Msg, msgIdx uint, tx *tx.Tx, txRe
 	return nil, berpctypes.ErrNotSupportedMessageType
 }
 
-func (m *Backend) getBankDenomsMetadata(coins sdk.Coins) map[string]banktypes.Metadata {
-	denomsMetadata := make(map[string]banktypes.Metadata)
-	for _, coin := range coins {
-		res, err := m.queryClient.BankQueryClient.DenomMetadata(m.ctx, &banktypes.QueryDenomMetadataRequest{
-			Denom: coin.Denom,
-		})
-		if err != nil || res == nil || coin.Denom == "" {
-			continue
-		}
-		denomsMetadata[coin.Denom] = res.Metadata
-	}
-
-	if len(denomsMetadata) == 0 {
-		// trying to insert denom metadata for the default RollApp coin
-		const defaultDenom = "urax"
-		const defaultDisplay = "RAX"
-		if found, _ := coins.Find(defaultDenom); found {
-			denomsMetadata[defaultDenom] = banktypes.Metadata{
-				DenomUnits: []*banktypes.DenomUnit{{
-					Denom:    defaultDenom,
-					Exponent: 0,
-				}, {
-					Denom:    defaultDisplay,
-					Exponent: 18,
-				}},
-				Base:    defaultDenom,
-				Display: defaultDisplay,
-				Name:    defaultDisplay,
-				Symbol:  defaultDisplay,
-			}
-		}
-	}
-
-	return denomsMetadata
-
-}
-
 func (m *Backend) addIbcPacketInfoIntoResponse(packet channeltypes.Packet, incomingPacket bool, res berpctypes.GenericBackendResponse, rb berpctypes.FriendlyResponseContentBuilderI) {
 	res["ibcPacketInfo"] = buildIbcPacketInfoFromPacket(packet, incomingPacket)
 
@@ -1443,7 +1406,7 @@ func (m *Backend) addIbcPacketInfoIntoResponse(packet channeltypes.Packet, incom
 
 			rb.WriteText(data.Sender).
 				WriteText(" transfers ").
-				WriteCoins(tokens, m.getBankDenomsMetadata(tokens)).
+				WriteCoins(tokens, m.GetBankDenomsMetadata(tokens)).
 				WriteText(" to ").
 				WriteAddress(data.Receiver)
 		} else {
