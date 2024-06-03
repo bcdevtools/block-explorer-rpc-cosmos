@@ -6,6 +6,8 @@ import (
 	berpctypes "github.com/bcdevtools/block-explorer-rpc-cosmos/be_rpc/types"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/server"
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"github.com/tendermint/tendermint/libs/log"
 )
 
@@ -66,6 +68,7 @@ type BackendI interface {
 	GetDenomMetadata(base string) (berpctypes.GenericBackendResponse, error)
 	GetDenomsMetadata(pageNo int) (berpctypes.GenericBackendResponse, error)
 	GetTotalSupply(pageNo int) (berpctypes.GenericBackendResponse, error)
+	GetBankDenomsMetadata(coins sdk.Coins) map[string]banktypes.Metadata
 
 	// Export fields
 
